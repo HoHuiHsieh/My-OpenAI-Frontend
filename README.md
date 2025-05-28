@@ -112,7 +112,7 @@ This script builds the Docker image, creates the container, and automatically st
 After starting the service, you can access the AI Platform Portal at:
 
 ```
-http://localhost:3000/share.html
+http://localhost:3000/share/index.html
 ```
 
 The portal offers a comprehensive user interface that includes:
