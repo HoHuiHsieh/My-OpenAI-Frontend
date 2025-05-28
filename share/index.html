@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Platform Portal</title>
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="global.css">
+    <script src="chart.js"></script>
+    <script src="auth.js" defer></script>
+    <script src="portal.js" defer></script>
+    <script src="usage-stats.js" defer></script>
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <div class="logo-container">
+                <img src="https://cdn-icons-png.flaticon.com/512/2103/2103832.png" alt="AI Platform Logo" class="logo">
+                <h1>AI Platform Portal</h1>
+            </div>
+            <div class="user-controls">
+                <span id="username-display"></span>
+                <button id="login-btn" class="btn">Login</button>
+                <button id="change-password-btn" class="btn" style="display:none;">Change Password</button>
+                <button id="logout-btn" class="btn" style="display:none;">Logout</button>
+                <button id="admin-panel-btn" class="btn admin-btn" style="display:none;">Admin Panel</button>
+            </div>
+        </div>
+    </header>
+    
+    <main>
+        <div class="welcome-banner">
+            <h2>Welcome to the AI Platform Portal</h2>
+            <p>Access powerful AI capabilities through a simple interface</p>
+        </div>
+        
+        <div id="login-required" class="login-required">
+            <h3>Please login to access platform services</h3>
+            <button id="login-prompt-btn" class="btn btn-large">Login</button>
+        </div>
+        
+        <div id="authenticated-content" class="authenticated-content" style="display:none;">
+            <div class="portal-buttons">
+                <div class="portal-button" data-service="chat">
+                    <img src="https://cdn-icons-png.flaticon.com/512/2076/2076218.png" alt="Chat Icon">
+                    <h3>Example Portal Button 1</h3>
+                    <p>Example Portal Button</p>
+                </div>
+                <div class="portal-button" data-service="embeddings">
+                    <img src="https://cdn-icons-png.flaticon.com/512/2103/2103835.png" alt="Embeddings Icon">
+                    <h3>Example Portal Button 2</h3>
+                    <p>Example Portal Button</p>
+                </div>
+            </div>
+            
+            <div class="dashboard-section" style="margin-top: 30px;">
+                <div class="usage-statistics">
+                    <h3>Your Usage Statistics</h3>
+                    <div class="usage-controls">
+                        <select id="period-select">
+                            <option value="day">Daily</option>
+                            <option value="week">Weekly</option>
+                            <option value="month">Monthly</option>
+                        </select>
+                        <select id="period-count">
+                            <option value="7">Last 7</option>
+                            <option value="14">Last 14</option>
+                            <option value="30" selected>Last 30</option>
+                        </select>
+                    </div>
+                    <div style="height: 300px; position: relative; margin: 20px 0;">
+                        <canvas id="usage-chart"></canvas>
+                    </div>
+                    <div class="usage-summary">
+                        <div class="summary-item">
+                            <span class="summary-label">Total Tokens:</span>
+                            <span id="total-tokens" class="summary-value">0</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Total Requests:</span>
+                            <span id="total-requests" class="summary-value">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bbs-container">
+                    <h3>Bulletin Board System</h3>
+                    <div id="bbs-messages" class="bbs-messages">
+                        <div class="bbs-message">
+                            <h4>Welcome to the AI Platform!</h4>
+                            <p>This bulletin board will display important announcements and updates about the platform.</p>
+                            <span class="bbs-date">May 28, 2025</span>
+                        </div>
+                        <!-- <div class="bbs-message">
+                            <h4>New Model: GPT-5-Turbo Now Available</h4>
+                            <p>We've added the latest GPT-5-Turbo model to our lineup. Try it out for enhanced capabilities!</p>
+                            <span class="bbs-date">May 25, 2025</span>
+                        </div>
+                        <div class="bbs-message">
+                            <h4>Scheduled Maintenance</h4>
+                            <p>The platform will be undergoing maintenance on June 5th from 2:00 AM to 4:00 AM UTC.</p>
+                            <span class="bbs-date">May 20, 2025</span>
+                        </div> -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <footer>
+        <div class="footer-container">
+            <p>&copy; 2025 AI Platform. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Login</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="btn">Login</button>
+            </form>
+            <div id="login-error" class="error-message"></div>
+        </div>
+    </div>
+
+    <div id="change-password-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Change Password</h2>
+            <form id="change-password-form">
+                <div class="form-group">
+                    <label for="current-password">Current Password:</label>
+                    <input type="password" id="current-password" name="current_password" required>
+                </div>
+                <div class="form-group">
+                    <label for="new-password">New Password:</label>
+                    <input type="password" id="new-password" name="new_password" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirm-password">Confirm New Password:</label>
+                    <input type="password" id="confirm-password" name="confirm_password" required>
+                </div>
+                <button type="submit" class="btn">Change Password</button>
+            </form>
+            <div id="password-change-error" class="error-message"></div>
+            <div id="password-change-success" class="success-message" style="color: green; display: none;"></div>
+        </div>
+    </div>
+</body>
+</html>

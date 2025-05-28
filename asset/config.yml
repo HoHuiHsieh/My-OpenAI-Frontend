@@ -1,0 +1,88 @@
+# OAuth2 Authentication Configuration
+oauth2:
+  secret_key: your-secret-key-placeholder
+  algorithm: HS256
+  access_token_expire_minutes: 30  # Short-lived token for regular sessions
+  user_token_expire_days: 180      # 6 months expiration for user tokens
+  admin_token_never_expires: false  # Admin tokens never expire
+  enable_authentication: true  # Set to false to disable authentication (for development)
+  exclude_paths:
+    - "/share"
+    - "/token"
+    - "/docs"
+    - "/redoc"
+    - "/openapi.json"
+  
+  # Default admin user settings
+  default_admin:
+    username: admin
+    email: admin@your.email.address
+    full_name: YourName
+    disabled: false
+    password: secret  # This will be hashed during initialization
+  
+  # Available scopes for authorization
+  scopes:
+    - "admin"
+    - "models:read"
+    - "chat:read"
+    - "embeddings:read"
+    
+
+# Database Configuration
+database:
+  engine: postgresql
+  host: 192.168.0.104
+  port: 5432
+  username: postgresql
+  password: password
+  name: ai_platform_auth
+  ssl_mode: prefer          # Options: disable, prefer, require, verify-ca, verify-full
+
+# Model Configuration
+models:
+  llama-3.1-8b-instruct:
+    host: 192.168.0.101
+    port: 8001
+    type: ["chat"]
+    response:
+      id: "meta/llama-3.1-8b-instruct"
+      created: 0
+      object: "model"
+      owned_by: "organization-owner"
+  llama-3.2-11b-vision-instruct:
+    host: 192.168.0.102
+    port: 8001
+    type: ["chat", "vision"]
+    response:
+      id: "meta/llama-3.1-8b-instruct"
+      created: 0
+      object: "model"
+      owned_by: "organization-owner"
+  nv-embed-v2:
+    host: 192.168.0.103
+    port: 8001
+    type: ["embedding"]
+    args:
+      instruction: "Given a question, retrieve passages that answer the question."
+    response:
+      id: "nvidia/nv-embed-v2"
+      created: 0
+      object: "model"
+      owned_by: "organization-owner"
+
+# Logging Configuration
+logging:
+  level: "INFO"  # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  use_database: true  # Whether to log to the database
+  async_logging: true  # Use asynchronous logging for better performance
+  table_prefix: "myopenaiapi"  # Prefix for tables in the database
+  log_retention_days: 365  # How many days to keep logs in the database
+  console:
+    enabled: true  # Always log to console as a fallback
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  components:
+    auth: "INFO"
+    database: "INFO"
+    middleware: "INFO"
+    controller: "WARNING"

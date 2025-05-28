@@ -1,0 +1,418 @@
+/* Admin Panel Specific Styles */
+
+/* Admin Required */
+.admin-required {
+    text-align: center;
+    padding: 3rem;
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+/* Admin Content Layout */
+.admin-content {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 1.5rem;
+    height: calc(100vh - 180px);
+}
+
+/* Admin Sidebar */
+.admin-sidebar {
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    padding: 1rem 0;
+}
+
+.admin-nav {
+    list-style: none;
+}
+
+.admin-nav li {
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    transition: background-color var(--transition-speed);
+    border-left: 4px solid transparent;
+}
+
+.admin-nav li:hover {
+    background-color: var(--light-gray);
+}
+
+.admin-nav li.active {
+    background-color: var(--light-gray);
+    border-left-color: var(--primary-color);
+    font-weight: 600;
+}
+
+/* Admin Main Content */
+.admin-main {
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+/* Admin Section */
+.admin-section {
+    display: none;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.admin-section.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Section Controls */
+.section-controls {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    gap: 1rem;
+    align-items: center;
+}
+
+.search-box input {
+    padding: 0.5rem;
+    border: 1px solid var(--light-gray);
+    border-radius: var(--border-radius);
+    min-width: 250px;
+}
+
+.filter-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.filter-controls select, 
+.filter-controls input {
+    padding: 0.5rem;
+    border: 1px solid var(--light-gray);
+    border-radius: var(--border-radius);
+}
+
+/* Dashboard Cards */
+.dashboard-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.dashboard-card {
+    background-color: var(--light-gray);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    text-align: center;
+}
+
+.card-value {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+    color: var(--primary-color);
+}
+
+/* Chart Container */
+.chart-container {
+    margin-bottom: 2rem;
+    position: relative;
+    min-height: 350px;
+}
+
+.chart-container h3 {
+    margin-bottom: 1rem;
+}
+
+/* Tables */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5rem;
+}
+
+.data-table th, 
+.data-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--light-gray);
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.data-table th {
+    background-color: var(--light-gray);
+    font-weight: 600;
+}
+
+.data-table tbody tr:hover {
+    background-color: #f1f3f5;
+}
+
+.activity-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.activity-table th, 
+.activity-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--light-gray);
+}
+
+.activity-table th {
+    background-color: var(--light-gray);
+    font-weight: 600;
+}
+
+/* Table Actions */
+.table-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--primary-color);
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.action-btn:hover {
+    text-decoration: underline;
+}
+
+.action-btn.delete {
+    color: var(--error-color);
+}
+
+/* Settings Form */
+.settings-group {
+    background-color: var(--light-gray);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 1.5rem;
+}
+
+.settings-group h3 {
+    margin-bottom: 1rem;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: auto;
+}
+
+#exclude-paths {
+    width: 100%;
+    font-family: monospace;
+    padding: 0.5rem;
+    border: 1px solid var(--dark-gray);
+    border-radius: var(--border-radius);
+}
+
+/* Modal Extras */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.btn-secondary {
+    background-color: var(--dark-gray);
+    border-color: var(--dark-gray);
+}
+
+.btn-secondary:hover {
+    background-color: #495057;
+    border-color: #495057;
+}
+
+.btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* Token Result */
+.token-result {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--light-gray);
+}
+
+.token-display {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+#generated-token {
+    width: 100%;
+    height: 80px;
+    resize: none;
+    font-family: monospace;
+    padding: 0.5rem;
+    border: 1px solid var(--dark-gray);
+    border-radius: var(--border-radius);
+}
+
+#copy-token-btn {
+    position: absolute;
+    bottom: 0.5rem;
+    right: 0.5rem;
+}
+
+.token-info {
+    font-size: 0.875rem;
+}
+
+.token-info p {
+    margin-bottom: 0.5rem;
+}
+
+/* User Modal Form Styles */
+#user-modal .modal-content {
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+#user-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+#user-form .form-group {
+    margin-bottom: 0.5rem;
+}
+
+#user-modal .form-actions {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--light-gray);
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    position: sticky;
+    bottom: 0;
+    background-color: white;
+}
+
+/* User Management Table Specific Styles */
+#users-section .data-table td {
+    position: relative;
+}
+
+#users-section .data-table td:hover {
+    overflow: visible;
+    white-space: normal;
+    background-color: #ffffff;
+    z-index: 1;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border-radius: 4px;
+}
+
+/* Adjust column widths for user table */
+#users-section .data-table th:nth-child(1), 
+#users-section .data-table td:nth-child(1) {
+    width: 15%; /* Username */
+}
+
+#users-section .data-table th:nth-child(2), 
+#users-section .data-table td:nth-child(2) {
+    width: 20%; /* Email */
+}
+
+#users-section .data-table th:nth-child(3), 
+#users-section .data-table td:nth-child(3) {
+    width: 20%; /* Full Name */
+}
+
+#users-section .data-table th:nth-child(4), 
+#users-section .data-table td:nth-child(4) {
+    width: 10%; /* Status */
+}
+
+#users-section .data-table th:nth-child(5), 
+#users-section .data-table td:nth-child(5) {
+    width: 20%; /* Scopes */
+}
+
+#users-section .data-table th:nth-child(6), 
+#users-section .data-table td:nth-child(6) {
+    width: 15%; /* Actions */
+    white-space: nowrap;
+    overflow: visible; /* Don't hide action buttons */
+}
+
+/* Fix the size of the admin usage chart */
+#admin-usage-chart {
+    width: 100% !important;
+    max-width: 800px;
+    height: 300px !important;
+    min-height: 200px;
+    display: block;
+    margin: 0 auto;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .admin-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .admin-sidebar {
+        margin-bottom: 1.5rem;
+    }
+    
+    .admin-nav {
+        display: flex;
+        overflow-x: auto;
+        padding-bottom: 0.5rem;
+    }
+    
+    .admin-nav li {
+        white-space: nowrap;
+        padding: 0.5rem 1rem;
+        border-left: none;
+        border-bottom: 2px solid transparent;
+    }
+    
+    .admin-nav li.active {
+        border-bottom-color: var(--primary-color);
+        border-left-color: transparent;
+    }
+    
+    .section-controls,
+    .filter-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .search-box input {
+        min-width: auto;
+    }
+}
