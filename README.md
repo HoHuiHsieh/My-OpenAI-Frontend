@@ -137,35 +137,6 @@ Detailed documentation is available in the `doc` folder:
 
 - [Triton Inference Server](https://github.com/triton-inference-server/server) - The backend inference server used by this project
 
-## Development Roadmap
-
-Below is a list of planned features and improvements for this project:
-
-- [ ] **Authentication Enhancements**
-  - [ ] Implement multi-factor authentication
-  - [ ] Add OAuth2 provider integration (Google, GitHub)
-  - [ ] Improve token refresh mechanism
-
-- [ ] **Model Integrations**
-  - [ ] Add support for more model families (Mistral, Falcon, Phi)
-  - [ ] Implement function calling capabilities in chat API
-  - [ ] Add image generation API compatibility
-
-- [ ] **Monitoring & Administration**
-  - [ ] Enhance admin dashboard with more detailed analytics
-  - [ ] Implement rate limiting and quota system
-  - [ ] Add real-time model performance metrics
-
-- [ ] **UI Improvements**
-  - [ ] Create a more comprehensive chat playground
-  - [ ] Implement theme switching (light/dark mode)
-  - [ ] Add mobile-responsive design improvements
-
-- [ ] **DevOps & Deployment**
-  - [ ] Implement CI/CD pipeline for automated testing
-  - [ ] Create Kubernetes deployment configurations
-  - [ ] Add monitoring and alerting system integration
-
 ## About
 
 This project was developed for personal research to explore building a proxy server that enhances Triton Inference Server with additional features while maintaining OpenAI API compatibility.
