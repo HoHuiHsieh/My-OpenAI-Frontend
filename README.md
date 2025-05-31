@@ -2,7 +2,7 @@
 
 A proxy server to enhance OpenAI compatible frontend for Triton Inference Server. This project provides an OpenAI API-compatible interface for Triton Inference Server, enhancing it with authentication, logging, usage tracking, and user management capabilities.
 
-> **Note:** This project is currently under construction. Features and documentation are actively being developed.
+> **Note:** This project is a functional proof of concept that demonstrates integrating Triton Inference Server with OpenAI-compatible APIs.
 
 This is an AI-assisted (GitHub Copilot) development project for learning purposes.
 
@@ -58,6 +58,10 @@ This is an AI-assisted (GitHub Copilot) development project for learning purpose
 ### Running in Development Mode
 
 1. Clone this repository:
+   ```bash
+   git clone https://github.com/HoHuiHsieh/My-OpenAI-Frontend
+   cd My-OpenAI-Frontend
+   ```
 
 2. Configure your settings:
    ```bash
@@ -85,14 +89,14 @@ This is an AI-assisted (GitHub Copilot) development project for learning purpose
      - Console, file, and database logging options
      - Usage tracking and retention policies
 
-3. Start the development environment:
+3. Use the start script with various options:
+
+   **Development Mode** (interactive bash shell):
    ```bash
-   ./start-dev.sh
+   ./start.sh dev
    ```
    
-   This script builds a Docker image based on Python 3.10, creates a container named "my_openai_frontend", and mounts your local directory to /workspace.
-
-4. Once inside the container, start the application:
+   This builds a Docker image based on Python 3.10, creates a container named "my_openai_frontend", and mounts your local directory to /workspace. Once inside the container, you can start the application manually:
    ```bash
    python3 src/main.py
    ```
@@ -102,17 +106,48 @@ This is an AI-assisted (GitHub Copilot) development project for learning purpose
 To start the service directly:
 
 ```bash
-./start-serve.sh
+./start.sh serve
 ```
 
 This script builds the Docker image, creates the container, and automatically starts the application.
+
+### Running the React Development Server
+
+To work on the frontend React application:
+
+```bash
+./start.sh react-dev
+```
+
+After the container starts, you can access the container and run:
+```bash
+npm install  # Only needed first time
+npm run dev
+```
+
+The React development server will be available at http://localhost:8080.
+
+### Running with Docker Compose
+
+To start all services including PostgreSQL database:
+
+```bash
+./start.sh compose-dev
+```
+
+This starts the main service, React development server, and PostgreSQL database using docker-compose.
 
 ### Accessing the Portal
 
 After starting the service, you can access the AI Platform Portal at:
 
 ```
-http://localhost:3000/share/index.html
+http://localhost:3000/share/
+```
+
+For the React development version (when using react-dev mode), access it at:
+```
+http://localhost:8080/
 ```
 
 The portal offers a comprehensive user interface that includes:
@@ -121,6 +156,14 @@ The portal offers a comprehensive user interface that includes:
 - **Usage Statistics**: Real-time dashboards and detailed analytics to monitor API usage, track consumption, and view historical trends.
 - **Bulletin Board System**: An announcement board for important updates, system notifications, and community messages.
 - **Admin Panel**: A dedicated interface for administrators to manage users, roles, and monitor system activity logs.
+
+#### API Endpoints
+
+The main API endpoints are available at:
+- API Documentation: `http://localhost:3000/docs` or `http://localhost:3000/redoc`
+- OpenAI-compatible API: `http://localhost:3000/v1/...` 
+- Admin API: `http://localhost:3000/admin/...`
+- Authentication: `http://localhost:3000/token`
 
 ## Documentation
 
@@ -137,9 +180,58 @@ Detailed documentation is available in the `doc` folder:
 
 - [Triton Inference Server](https://github.com/triton-inference-server/server) - The backend inference server used by this project
 
+## System Architecture
+
+### Component Overview
+
+The system consists of these main components:
+
+1. **FastAPI Backend**: The core proxy service that:
+   - Routes API requests to Triton Inference Server
+   - Handles authentication and authorization
+   - Tracks usage statistics and manages user accounts
+   - Provides OpenAI API-compatible endpoints
+
+2. **React Frontend**: A web interface that provides:
+   - User management dashboard
+   - Usage statistics visualization
+   - Model exploration and testing interfaces
+   - Administrative tools
+
+3. **Triton Inference Server**: External server (must be configured separately) that:
+   - Hosts the AI models (LLM, Embedding models, etc.)
+   - Provides efficient inference capabilities
+   - Scales to handle multiple concurrent requests
+
+4. **PostgreSQL Database**: Stores:
+   - User accounts and authentication data
+   - Usage statistics and tracking information
+   - System logs and audit trails
+
+### Integration Flow
+
+```
+                   ┌─────────────────┐
+                   │    Web Client   │
+                   └────────┬────────┘
+                            │
+                            ▼
+┌───────────────────────────────────────────────┐
+│             My OpenAI Frontend                │
+├───────────────┬─────────────┬────────────────┤
+│ Authentication │ API Routing │ Usage Tracking │
+└───────┬───────┴──────┬──────┴───────┬────────┘
+        │              │              │
+        ▼              ▼              ▼
+┌───────────┐  ┌───────────────┐  ┌─────────────┐
+│ OAuth2 DB │  │Triton Inference│  │ Statistics  │
+│(PostgreSQL)│  │    Server     │  │ Dashboard   │
+└───────────┘  └───────────────┘  └─────────────┘
+```
+
 ## About
 
-This project was developed for personal research to explore building a proxy server that enhances Triton Inference Server with additional features while maintaining OpenAI API compatibility.
+This project was developed for personal research to explore building a proxy server that enhances Triton Inference Server with additional features while maintaining OpenAI API compatibility. It demonstrates patterns for authentication, logging, usage tracking, and API compatibility in AI service deployments.
 
 ## Contact
 

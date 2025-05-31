@@ -5,11 +5,13 @@ This file imports and mounts FastAPI applications from subfolders.
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from v1 import v1_router
-from oauth2.auth import router as auth_router
-from oauth2.controller import router as admin_router
-from oauth2.middleware import AuthMiddleware
+from oauth2.routes.session import session_router
+from oauth2.routes.access import access_router
+from oauth2.routes.admin import admin_router
+from oauth2.middleware import OAuth2Middleware as AuthMiddleware
 from oauth2.migrations import initialize_database
 from config import get_config
 from logger import get_logger, UsageLogger
@@ -69,12 +71,22 @@ app = FastAPI(
 )
 
 # Include OAuth2 authentication and admin routes
-app.include_router(auth_router)
+app.include_router(session_router)
+app.include_router(access_router)
 app.include_router(admin_router)
 
 # Add authentication middleware if enabled in config
 if enable_auth:
     app.add_middleware(AuthMiddleware, exclude_paths=exclude_paths)
+
+# Configure CORS middleware - must be added AFTER AuthMiddleware to process CORS first
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow the React app domain
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 # Include the v1 router (protected by the authentication middleware)
 logger.info("Mounting v1 API router")

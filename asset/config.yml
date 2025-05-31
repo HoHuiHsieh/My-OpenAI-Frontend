@@ -8,7 +8,9 @@ oauth2:
   enable_authentication: true  # Set to false to disable authentication (for development)
   exclude_paths:
     - "/share"
-    - "/token"
+    - "/session"
+    - "/access"
+    - "/admin"
     - "/docs"
     - "/redoc"
     - "/openapi.json"
@@ -16,8 +18,8 @@ oauth2:
   # Default admin user settings
   default_admin:
     username: admin
-    email: admin@your.email.address
-    full_name: YourName
+    email: your@email.here
+    full_name: YOUR_FULL_NAME_HERE
     disabled: false
     password: secret  # This will be hashed during initialization
   
@@ -32,17 +34,18 @@ oauth2:
 # Database Configuration
 database:
   engine: postgresql
-  host: 192.168.0.104
+  host: postgres
   port: 5432
   username: postgresql
   password: password
   name: ai_platform_auth
   ssl_mode: prefer          # Options: disable, prefer, require, verify-ca, verify-full
+  table_prefix: "myopenaiapi"  # Prefix for tables in the database
 
 # Model Configuration
 models:
   llama-3.1-8b-instruct:
-    host: 192.168.0.101
+    host: 192.168.0.100
     port: 8001
     type: ["chat"]
     response:
@@ -51,7 +54,7 @@ models:
       object: "model"
       owned_by: "organization-owner"
   llama-3.2-11b-vision-instruct:
-    host: 192.168.0.102
+    host: 192.168.0.101
     port: 8001
     type: ["chat", "vision"]
     response:
@@ -60,7 +63,7 @@ models:
       object: "model"
       owned_by: "organization-owner"
   nv-embed-v2:
-    host: 192.168.0.103
+    host: 192.168.0.102
     port: 8001
     type: ["embedding"]
     args:
@@ -76,7 +79,7 @@ logging:
   level: "INFO"  # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
   use_database: true  # Whether to log to the database
   async_logging: true  # Use asynchronous logging for better performance
-  table_prefix: "myopenaiapi"  # Prefix for tables in the database
+  table_prefix: "myopenaiapi"  # Prefix for log tables in the database
   log_retention_days: 365  # How many days to keep logs in the database
   console:
     enabled: true  # Always log to console as a fallback

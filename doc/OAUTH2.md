@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides detailed information about the OAuth2 authentication service implemented in the My OpenAI Frontend API. The authentication system supports token-based authentication with different token lifetimes, role-based access control through scopes, and comprehensive user management.
+This document provides detailed information about the OAuth2 authentication service implemented in the My OpenAI Frontend API. The authentication system supports token-based authentication with different token lifetimes, role-based access control through scopes, comprehensive user management, and token verification.
 
 ## Configuration
 
@@ -176,6 +176,7 @@ Get detailed information about the current token.
   "is_expired": false,
   "is_admin": false,
   "is_long_lived": false,
+  "token_type": "short_lived",  // "short_lived" or "long_lived"
   "never_expires": false
 }
 ```
@@ -221,6 +222,72 @@ curl -X POST "http://localhost:3000/change-password" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -H "Content-Type: application/json" \
   -d '{"current_password": "oldpassword", "new_password": "newpassword"}'
+```
+
+### API Access Management
+
+These endpoints manage API access tokens with fine-grained scope control.
+
+#### Refresh Access Token
+
+Create a new API access token for the authenticated user.
+
+**Endpoint:** `POST /access/refresh`
+
+**Headers:**
+- `Authorization: Bearer {token}`
+
+**Response Format:**
+```json
+{
+  "access_token": "string",
+  "token_type": "bearer",
+  "expires_at": "string" // ISO format date
+}
+```
+
+**cURL Example:**
+```bash
+curl -X POST "http://localhost:3000/access/refresh" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+#### Token Information
+
+Get detailed information about a specific token by providing the token in the request.
+
+**Endpoint:** `POST /access/info`
+
+**Headers:**
+- `Authorization: Bearer {token}` (For authentication)
+
+**Request Format:**
+```json
+{
+  "token": "string" // The token to verify, NOT the authentication token
+}
+```
+
+**Response Format:**
+```json
+{
+  "username": "string",
+  "type": "string",
+  "scopes": ["string"],
+  "expires_at": "string", // ISO format date
+  "issued_at": "string", // ISO format date
+  "active": boolean // Whether the token is active (not expired and not revoked)
+}
+```
+
+**Note:** This endpoint checks if the provided token has been revoked in the database.
+
+**cURL Example:**
+```bash
+curl -X POST "http://localhost:3000/access/info" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}'
 ```
 
 ## Admin API Endpoints
@@ -368,7 +435,8 @@ Admins can generate tokens for any user in the system.
 ```json
 {
   "username": "string",
-  "last_refresh": "string", // ISO format date
+  "last_refresh": "string", // ISO format date of last token refresh
+  "last_login": "string", // ISO format date of last login
   "next_refresh_required": "string" // ISO format date or "never" for admin users
 }
 ```
@@ -385,7 +453,8 @@ Admins can generate tokens for any user in the system.
 [
   {
     "username": "string",
-    "last_refresh": "string", // ISO format date
+    "last_refresh": "string", // ISO format date of last token refresh
+    "last_login": "string", // ISO format date of last login
     "next_refresh_required": "string" // ISO format date or "never" for admin users
   }
 ]
@@ -401,7 +470,9 @@ Admins can generate tokens for any user in the system.
 **Response:** 204 No Content
 
 **Description:**
-This endpoint revokes a user's long-lived token by removing their `last_token_refresh` timestamp. This forces the user to request a new token through the standard authentication flow.
+This endpoint revokes a user's long-lived token by removing their `last_token_refresh` timestamp and setting the `revoked` flag to true on their associated tokens in the database. This forces the user to request a new token through the standard authentication flow.
+
+All token verification endpoints will check if a token has been revoked before allowing access. The system maintains a record of revoked tokens to prevent their reuse, even if the JWT itself has not expired.
 
 ## Database Schema
 
@@ -418,7 +489,8 @@ CREATE TABLE myopenaiapi_users (
     disabled BOOLEAN DEFAULT FALSE,
     hashed_password VARCHAR NOT NULL,
     scopes VARCHAR[] DEFAULT '{}',
-    last_token_refresh VARCHAR
+    last_token_refresh VARCHAR,
+    last_login VARCHAR
 );
 ```
 
@@ -429,7 +501,50 @@ Key fields explained:
 - `disabled`: If true, the user's access is revoked
 - `hashed_password`: Bcrypt-hashed password (using bcrypt scheme)
 - `scopes`: Array of permission scopes granted to the user
-- `last_token_refresh`: ISO format datetime of the last token refresh
+- `last_token_refresh`: ISO format datetime of the last long-lived token refresh
+- `last_login`: ISO format datetime of the last login with short-lived token
+
+### Tokens Table
+
+```sql
+CREATE TABLE myopenaiapi_tokens (
+    id SERIAL PRIMARY KEY,
+    token VARCHAR UNIQUE NOT NULL,
+    token_type VARCHAR NOT NULL,
+    user_id INTEGER REFERENCES myopenaiapi_users(id) ON DELETE CASCADE,
+    scopes JSONB NOT NULL DEFAULT '[]',
+    token_metadata JSONB,
+    expires_at TIMESTAMP,
+    revoked BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Key fields explained:
+- `id`: Unique identifier for the token
+- `token`: The actual JWT token value (hashed for security)
+- `token_type`: Type of token (either "session" or "access")
+- `user_id`: Foreign key reference to the user who owns this token
+- `scopes`: JSON array of the permission scopes granted in this token
+- `token_metadata`: Additional metadata about the token (creation reason, admin who created it, etc.)
+- `expires_at`: When the token expires (null for never-expiring tokens)
+- `revoked`: Boolean flag indicating if the token has been explicitly revoked
+- `created_at`: When the token was created
+
+For security purposes:
+- When a new access token is generated for a user, all their previous access tokens are automatically revoked
+- This "one active token per user" model helps prevent security issues from multiple active tokens
+- Tokens can be explicitly revoked via the admin interface or API
+- The system checks if a token has been revoked on each authenticated request
+
+Key fields explained:
+- `token`: The actual token value (JWT)
+- `token_type`: Type of token ("session" or "access")
+- `user_id`: Foreign key reference to the user who owns the token
+- `scopes`: JSON array of permission scopes for this specific token
+- `token_metadata`: Additional JSON metadata about the token
+- `expires_at`: Expiration timestamp for the token
+- `revoked`: Flag indicating if the token has been explicitly revoked
 
 ### Logs Table (when logging to database is enabled)
 
@@ -454,6 +569,8 @@ This table stores authentication events and can be used for security auditing an
 - Used for temporary access (interactive sessions, testing)
 - Default lifetime: 30 minutes (configurable via `access_token_expire_minutes`)
 - Obtained through standard OAuth2 flow (`/token` endpoint)
+- When generated, updates the user's `last_login` timestamp
+- Works with authentication middleware like long-lived tokens
 
 ### Long-lived Tokens
 - Used for persistent API access
@@ -461,12 +578,21 @@ This table stores authentication events and can be used for security auditing an
 - Obtained through `/refresh-token` endpoint
 - Regular users must refresh their tokens before expiration
 - Token refresh history is tracked to invalidate old tokens
+- When refreshed, updates the user's `last_token_refresh` timestamp
 
 ### Admin Tokens
 - Can have unlimited lifetime if `admin_token_never_expires` is set to true
 - Special privileges for user management
 - Can generate tokens for other users
 - Tokens can be revoked by an administrator
+
+### Token Revocation
+- Any token can be explicitly revoked even before its expiration
+- Revoked tokens are marked in the database with a `revoked` flag
+- The system checks if tokens are revoked during verification
+- Token revocation is permanent and requires generating a new token
+- Administrators can revoke any user's tokens
+- The `/access/info` endpoint can verify if a token has been revoked
 
 ## Scopes
 
@@ -547,3 +673,9 @@ When `use_database` is enabled, authentication logs are stored in the database f
 3. Restrict admin access to trusted users only
 4. Regularly audit user accounts and token usage
 5. Consider shortening token lifetimes for higher security requirements
+6. Promptly revoke tokens when they are no longer needed or if a security breach is suspected
+7. Use the `/access/info` endpoint to verify token status and validity
+8. Implement proper error handling for token revocation scenarios
+9. Regularly monitor and clean up expired and revoked tokens
+10. Be aware that the system automatically revokes all previous access tokens for a user when a new token is generated, maintaining a one-active-token-per-user security model
+10. Consider implementing rate limiting for token verification and generation requests
