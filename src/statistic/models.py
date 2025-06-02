@@ -1,61 +1,83 @@
 """
-This module defines the data models for usage statistics.
+Usage Statistics Models
 
-It contains Pydantic models for:
-- Response formats for usage statistics endpoints
-- Enums for time periods and data types
+This module defines Pydantic models for usage statistics data.
 """
-
-from typing import Dict, List, Optional
-from pydantic import BaseModel
-from enum import Enum
-
-
-class TimePeriod(str, Enum):
-    """Enum for time periods to group statistics by"""
-    DAY = "day"
-    WEEK = "week" 
-    MONTH = "month"
+from datetime import datetime, date
+from typing import Dict, List, Optional, Any, Union
+from pydantic import BaseModel, Field
 
 
-class UsageStatistics(BaseModel):
-    """Model for usage statistics data"""
-    period_start: str
-    period_end: str
+class TokenUsage(BaseModel):
+    """Token usage statistics."""
     prompt_tokens: int
-    completion_tokens: Optional[int]
+    completion_tokens: Optional[int] = None
     total_tokens: int
-    request_count: int
-    models: Dict[str, int] = {}  # Model name -> token count
-    api_types: Dict[str, int] = {}  # API type -> token count
 
 
-class UserStatistics(BaseModel):
-    """Model for user-specific usage statistics"""
+class UsageEntry(BaseModel):
+    """Individual usage log entry."""
+    id: Optional[int] = None
+    timestamp: datetime
+    api_type: str
     user_id: str
-    statistics: List[UsageStatistics]
-
-
-class AllUsersStatistics(BaseModel):
-    """Model for all users' usage statistics (admin only)"""
-    users: List[UserStatistics]
-    total_prompt_tokens: int
-    total_completion_tokens: Optional[int]
+    model: str
+    request_id: Optional[str] = None
+    prompt_tokens: int
+    completion_tokens: Optional[int] = None
     total_tokens: int
-    total_request_count: int
+    input_count: Optional[int] = None
+    extra_data: Optional[Dict[str, Any]] = None
 
 
-class StatisticsSummary(BaseModel):
-    """Model for dashboard statistics summary (admin only)"""
+class DailyUsage(BaseModel):
+    """Daily usage statistics."""
+    date: date
+    total_tokens: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    request_count: int = 0
+
+
+class WeeklyUsage(BaseModel):
+    """Weekly usage statistics."""
+    week_start: date
+    week_end: date
+    total_tokens: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    request_count: int = 0
+
+
+class MonthlyUsage(BaseModel):
+    """Monthly usage statistics."""
+    month: int  # 1-12
+    year: int
+    total_tokens: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    request_count: int = 0
+
+
+class UsageSummary(BaseModel):
+    """Summary of usage statistics."""
     total_users: int
     active_users_today: int
-    api_requests_today: int
-    total_tokens_today: int
+    requests_today: int
+    tokens_today: int
 
 
-class RecentActivity(BaseModel):
-    """Model for recent user activity"""
-    timestamp: str
+class UserDetailedUsage(BaseModel):
+    """Detailed usage for a specific user."""
     username: str
-    action: str
-    details: str
+    daily_usage: List[DailyUsage] = []
+    weekly_usage: List[WeeklyUsage] = []
+    monthly_usage: List[MonthlyUsage] = []
+
+
+class AllUsersUsage(BaseModel):
+    """Combined usage statistics for all users."""
+    daily_usage: List[DailyUsage] = []
+    weekly_usage: List[WeeklyUsage] = []
+    monthly_usage: List[MonthlyUsage] = []
+    by_user: Dict[str, UserDetailedUsage] = {}

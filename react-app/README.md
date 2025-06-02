@@ -20,7 +20,7 @@ To start the development server:
 ./start.sh react-dev
 ```
 
-Open [http://localhost:8080](http://localhost:8080) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 ### Production Build
 
@@ -33,44 +33,20 @@ To create and serve a production build:
 ## Project Structure
 
 - `src/pages/` - Contains all page components and API routes
-- `src/components/` - Reusable components for UI elements like modals and cards
+- `src/components/` - Reusable components
 - `src/styles/` - CSS modules for styling
-- `src/context/` - React context providers (AuthContext)
-- `src/services/` - API service integrations (access, admin, token, usage)
-- `src/theme/` - MUI theme configurations
-- `src/utils/` - Utility functions and helpers
-- `public/` - Static assets like images and icons
+- `public/` - Static assets like images and fonts
 
 ## API Integration
 
-The frontend communicates with the backend API to fetch and submit data. API services are organized in the `src/services/` directory, handling authentication, admin functions, token management, and usage statistics.
+The frontend communicates with the backend API to fetch and submit data. Currently, mock API endpoints are included for development purposes.
 
 ## Features
 
-- User authentication with login modal and session management
-- Dashboard with interactive usage statistics
-- Models browsing and integration
-- Admin interface with user management capabilities
-- Interactive data visualization with Chart.js
-- Service cards for different AI capabilities
-- Token management system
-- Password change functionality
-
-## Key Dependencies
-
-- **Next.js 15** - React framework for production
-- **Material UI** - Component library with MUI v7
-- **Chart.js** - For interactive data visualization
-- **Axios** - HTTP client for API requests
-- **Emotion** - CSS-in-JS styling solution
-
-## Available Scripts
-
-- `npm run dev` - Start development server on port 8080
-- `npm run build` - Create production build
-- `npm run start` - Start production server
-- `npm run build-static` - Build and copy static files
-- `npm run lint` - Run ESLint
+- Dashboard with usage statistics
+- Models browsing
+- Admin interface
+- Interactive charts with Chart.js
 
 ## Learn More
 

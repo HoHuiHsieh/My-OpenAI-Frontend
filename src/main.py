@@ -15,7 +15,7 @@ from oauth2.middleware import OAuth2Middleware as AuthMiddleware
 from oauth2.migrations import initialize_database
 from config import get_config
 from logger import get_logger, UsageLogger
-from statistic import router as statistics_router
+from statistic import statistic_router
 from constant import DEFAULT_SHARE_PATH
 import os
 
@@ -94,7 +94,7 @@ app.include_router(v1_router)
 
 # Include usage statistics router
 logger.info("Mounting usage statistics router")
-app.include_router(statistics_router)
+app.include_router(statistic_router)
 
 # Custom StaticFiles class that redirects to index.html when path is '/'
 class IndexStaticFiles(StaticFiles):

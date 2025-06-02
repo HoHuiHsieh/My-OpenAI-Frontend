@@ -7,73 +7,101 @@
  */
 import api from './api';
 
-interface UsageStatistics {
-  period_start: string; // ISO format date
-  period_end: string; // ISO format date
+interface DailyUsage {
+  date: string; // ISO date string
+  total_tokens: number;
   prompt_tokens: number;
-  completion_tokens?: number; // Optional, can be null
-  total_tokens: number;
+  completion_tokens: number;
   request_count: number;
-  models?: Record<string, number>; // Model name -> token count
-  api_types?: Record<string, number>; // API type -> token count
 }
-
-interface AllUsersStatistics {
-  users: UsageStatistics[];
-  total_prompt_tokens: number;
-  total_completion_tokens?: number; // Optional, can be null
+interface WeeklyUsage {
+  week_start: string; // ISO date string
+  week_end: string; // ISO date string
   total_tokens: number;
-  total_request_count: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  request_count: number;
 }
-
-interface StatisticsSummary {
+interface MonthlyUsage {
+  month: number; // 1-12
+  year: number;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  request_count: number;
+}
+interface UserDetailedUsage {
+  username: string;
+  daily_usage: DailyUsage[];
+  weekly_usage: WeeklyUsage[];
+  monthly_usage: MonthlyUsage[];
+}
+interface AllUsersUsage {
+  daily_usage: DailyUsage[];
+  weekly_usage: WeeklyUsage[];
+  monthly_usage: MonthlyUsage[];
+  by_user: Record<string, UserDetailedUsage>;
+}
+interface UsageSummary {
   total_users: number;
   active_users_today: number;
-  api_requests_today: number;
-  total_tokens_today: number;
+  requests_today: number;
+  tokens_today: number;
 }
-
-interface RecentActivity {
-  timestamp: string; // ISO format date
-  username: string;
-  action: string; // e.g., "login", "token refresh", etc.
-  details?: string; // Optional, additional details about the action
+interface UsageEntry {
+  id?: number;
+  timestamp: string; // ISO date string
+  api_type: string;
+  user_id: string;
+  model: string;
+  request_id?: string;
+  prompt_tokens: number;
+  completion_tokens?: number;
+  total_tokens: number;
+  input_count?: number;
+  extra_data?: Record<string, any>;
 }
 
 // Usage Statistics API endpoints
 export const usageApi = {
   // User endpoints
-  getUserUsageByPeriod: (period: 'day' | 'week' | 'month', params?: {
-    num_periods?: number;
-    api_type?: string;
-    model?: string;
-  }): Promise<UsageStatistics[]> => {
-    return api.get(`/usage/me/${period}`, { params });
+  getUserUsageByPeriod: (period: 'day' | 'week' | 'month' | 'all', params?: {
+    days?: number;
+    weeks?: number;
+    months?: number;
+  }): Promise<UserDetailedUsage> => {
+    return api.get(`/usage/${period}`, { params });
   },
 
   // Admin endpoints
-  getSpecificUserUsage: (username: string, period: 'day' | 'week' | 'month', params?: {
-    num_periods?: number;
-    api_type?: string;
-    model?: string;
-  }): Promise<UsageStatistics[]> => {
-    return api.get(`/usage/admin/user/${username}/${period}`, { params });
+  getSpecificUserUsage: (username: string, period: 'day' | 'week' | 'month' | 'all', params?: {
+    days?: number;
+    weeks?: number;
+    months?: number;
+  }): Promise<UserDetailedUsage> => {
+    return api.get(`/admin/usage/user/${username}/${period}`, { params });
   },
 
-  getAllUsersUsage: (period: 'day' | 'week' | 'month', params?: {
-    num_periods?: number;
-    username?: string;
-    api_type?: string;
-    model?: string;
-  }): Promise<AllUsersStatistics> => {
-    return api.get(`/usage/admin/all/${period}`, { params });
+  // Get usage statistics for all users by period
+  getAllUsersUsage: (period: 'day' | 'week' | 'month' | 'all', params?: {
+    days?: number;
+    weeks?: number;
+    months?: number;
+  }): Promise<AllUsersUsage> => {
+    return api.get(`/admin/usage/all/${period}`, { params });
   },
 
-  getAdminSummary: (): Promise<StatisticsSummary> => {
-    return api.get('/usage/admin/summary');
+  // Admin summary
+  getAdminSummary: (): Promise<UsageSummary> => {
+    return api.get('/admin/usage/summary');
   },
 
-  getRecentActivity: (): Promise<RecentActivity> => {
-    return api.get('/usage/admin/recent');
+  // Get a list of API requests made by a specific user.
+  getUserApiRequestsByPeriod: (
+    username: string,
+    period: 'day' | 'week' | 'month' | 'all',
+    params?: { limit?: number }
+  ): Promise<UsageEntry[]> => {
+    return api.get(`/admin/usage/list/user/${username}/${period}`, { params });
   },
 };

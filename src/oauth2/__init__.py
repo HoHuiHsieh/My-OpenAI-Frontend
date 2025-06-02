@@ -57,14 +57,8 @@ Admin API Endpoints (require admin role):
 
 """
 
-from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
-from pydantic import BaseModel
-import jwt
-from datetime import datetime, timedelta
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
-import logging
 from config import get_config
 from logger import get_logger
 

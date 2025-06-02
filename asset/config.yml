@@ -18,8 +18,8 @@ oauth2:
   # Default admin user settings
   default_admin:
     username: admin
-    email: your@email.here
-    full_name: YOUR_FULL_NAME_HERE
+    email: your@email.com
+    full_name: YourName
     disabled: false
     password: secret  # This will be hashed during initialization
   
@@ -45,7 +45,7 @@ database:
 # Model Configuration
 models:
   llama-3.1-8b-instruct:
-    host: 192.168.0.100
+    host: 192.168.1.201
     port: 8001
     type: ["chat"]
     response:
@@ -54,7 +54,7 @@ models:
       object: "model"
       owned_by: "organization-owner"
   llama-3.2-11b-vision-instruct:
-    host: 192.168.0.101
+    host: 192.168.1.202
     port: 8001
     type: ["chat", "vision"]
     response:
@@ -63,7 +63,7 @@ models:
       object: "model"
       owned_by: "organization-owner"
   nv-embed-v2:
-    host: 192.168.0.102
+    host: 192.168.1.203
     port: 8001
     type: ["embedding"]
     args:

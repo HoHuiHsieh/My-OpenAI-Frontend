@@ -1,3 +1,13 @@
+/**
+ * This module displays API usage statistics in a chart format.
+ * It allows users to select the time period and number of periods to view their usage data.
+ * The data is fetched from the API and displayed using a line chart.
+ * It also includes error handling and loading states.
+ * @module UsageStats
+ * @version 1.0.0
+ * @author Hsieh,HoHui 
+ */
+
 import React, { useEffect, useState, useRef, useId } from 'react';
 import { Box, Paper, Typography, CircularProgress, Alert, FormControl, Select, MenuItem, SelectChangeEvent, InputLabel } from '@mui/material';
 import { Line } from 'react-chartjs-2';
@@ -17,9 +27,9 @@ interface UsageStatsProps {
 
 
 /**
- * UsageStats component displays API usage statistics in a chart format.
- * It allows users to select the time period and number of periods to view their usage data.
- * The data is fetched from the API and displayed using a line chart.
+ * This component displays API usage statistics for the authenticated user.
+ * @param param0 
+ * @returns 
  */
 const UsageStats: React.FC<UsageStatsProps> = ({ className }) => {
     const { isAuthenticated, user } = useAuth();
@@ -86,26 +96,67 @@ const UsageStats: React.FC<UsageStatsProps> = ({ className }) => {
             setError(null);
 
             try {
-                const response = await usageApi.getUserUsageByPeriod(period, { num_periods: numPeriods });
+                // Map numPeriods to the correct param for the API
+                let params: any = {};
+                if (period === 'day') params.days = numPeriods;
+                else if (period === 'week') params.weeks = numPeriods;
+                else if (period === 'month') params.months = numPeriods;
 
-                const data = response;
-                if (!data || data.length === 0) {
-                    // Keep the initialized empty structure
+                const response = await usageApi.getUserUsageByPeriod(period, params);
+                
+                let dataArr: any[] = [];
+                if (period === 'day') {
+                    dataArr = response.daily_usage || [];
+                } else if (period === 'week') {
+                    dataArr = response.weekly_usage || [];
+                } else if (period === 'month') {
+                    dataArr = response.monthly_usage || [];
+                }
+
+                if (!dataArr || dataArr.length === 0) {
+                    setUsageData({
+                        labels: [],
+                        datasets: [
+                            { ...usageData.datasets[0], data: [] },
+                            { ...usageData.datasets[1], data: [] },
+                        ],
+                    });
                     return;
                 }
 
-                const sortedData = [...data].sort((a, b) =>
-                    new Date(a.period_start).getTime() - new Date(b.period_start).getTime()
-                );
+                // Sort by date/period
+                let sortedData = [...dataArr];
+                if (period === 'day') {
+                    sortedData.sort((a, b) =>
+                        new Date(a.date).getTime() - new Date(b.date).getTime()
+                    );
+                } else if (period === 'week') {
+                    sortedData.sort((a, b) =>
+                        new Date(a.week_start).getTime() - new Date(b.week_start).getTime()
+                    );
+                } else if (period === 'month') {
+                    sortedData.sort((a, b) =>
+                        a.year !== b.year ? a.year - b.year : a.month - b.month
+                    );
+                }
 
                 setUsageData({
                     labels: sortedData.map(item => {
-                        const date = new Date(item.period_start);
-                        return date.toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: period === 'month' ? 'numeric' : undefined
-                        });
+                        if (period === 'day') {
+                            const date = new Date(item.date);
+                            return date.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                            });
+                        } else if (period === 'week') {
+                            const start = new Date(item.week_start);
+                            const end = new Date(item.week_end);
+                            return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                        } else if (period === 'month') {
+                            return `${item.year}-${String(item.month).padStart(2, '0')}`;
+                        }
+                        return '';
                     }),
                     datasets: [
                         {
@@ -127,7 +178,6 @@ const UsageStats: React.FC<UsageStatsProps> = ({ className }) => {
             } catch (err) {
                 console.error('Failed to fetch usage data:', err);
                 setError('Failed to load usage statistics');
-                // Keep the chart with empty data rather than null
             }
         } finally {
             setLoading(false);
@@ -160,9 +210,12 @@ const UsageStats: React.FC<UsageStatsProps> = ({ className }) => {
                     </FormControl>
                     <FormControl size="small">
                         <Select value={numPeriods.toString()} onChange={handleNumPeriodsChange}>
+                            <MenuItem value="3">Last 3</MenuItem>
                             <MenuItem value="7">Last 7</MenuItem>
                             <MenuItem value="14">Last 14</MenuItem>
                             <MenuItem value="30">Last 30</MenuItem>
+                            <MenuItem value="60">Last 60</MenuItem>
+                            <MenuItem value="90">Last 90</MenuItem>
                         </Select>
                     </FormControl>
                 </Box>
