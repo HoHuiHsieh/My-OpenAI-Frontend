@@ -4,7 +4,7 @@ import re
 from typing import List, Tuple, Optional
 
 from logger import get_logger
-from .typedef import ToolCall, ToolCallFunction
+from ..typedef import ToolCall, ToolCallFunction
 
 # Set up logger for this module
 logger = get_logger(__name__)
@@ -60,7 +60,7 @@ def extract_tool_calls_from_text(text: str, parallel_tool_calls: Optional[bool] 
                             # Create a proper ToolCallFunction
                             tool_function = ToolCallFunction(
                                 name=function_data['name'],
-                                arguments=arguments
+                                arguments=json.dumps(arguments, ensure_ascii=False) if isinstance(arguments, dict) else arguments
                             )
 
                             # Create the ToolCall

@@ -61,6 +61,7 @@ from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 from passlib.context import CryptContext
 from config import get_config
 from logger import get_logger
+from .scopes import available_scopes
 
 
 # Initialize the enhanced logging system
@@ -73,7 +74,7 @@ oauth2_config = config.get("oauth2", {})
 # Initialize OAuth2 components
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="session",
-    scopes={scope: scope for scope in oauth2_config.get("scopes", [])}
+    scopes={scope: scope for scope in available_scopes},
 )
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -125,7 +126,7 @@ __all__ = [
     "RoleBasedAccessControl", "verify_scopes",
     
     # Scopes
-    "Scopes", "available_scopes",
+    "Scopes", "available_scopes", "admin_scopes", "user_scopes",
     
     # Token management
     "create_session_token", "create_access_token", 

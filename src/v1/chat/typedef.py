@@ -59,8 +59,8 @@ class ToolCallFunction(BaseModel):
     name: str = Field(
         description="The name of the function to be called."
     )
-    arguments: Dict[str, Any] = Field(
-        description="The arguments to be passed to the function."
+    arguments: str = Field(
+        description="The stringified json object of the arguments to be passed to the function."
     )    
 
 

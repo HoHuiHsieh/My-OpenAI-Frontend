@@ -18,6 +18,7 @@ from ..auth import authenticate_user, verify_password, get_password_hash
 from ..token_manager import create_session_token, verify_token
 from ..rbac import verify_scopes
 from ..db.operations import get_user_by_username
+from ..scopes import user_scopes, admin_scopes
 from . import session_router
 
 # Initialize logger

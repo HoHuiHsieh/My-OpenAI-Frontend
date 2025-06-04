@@ -7,41 +7,7 @@
  */
 import api from './api';
 
-interface DailyUsage {
-  date: string; // ISO date string
-  total_tokens: number;
-  prompt_tokens: number;
-  completion_tokens: number;
-  request_count: number;
-}
-interface WeeklyUsage {
-  week_start: string; // ISO date string
-  week_end: string; // ISO date string
-  total_tokens: number;
-  prompt_tokens: number;
-  completion_tokens: number;
-  request_count: number;
-}
-interface MonthlyUsage {
-  month: number; // 1-12
-  year: number;
-  total_tokens: number;
-  prompt_tokens: number;
-  completion_tokens: number;
-  request_count: number;
-}
-interface UserDetailedUsage {
-  username: string;
-  daily_usage: DailyUsage[];
-  weekly_usage: WeeklyUsage[];
-  monthly_usage: MonthlyUsage[];
-}
-interface AllUsersUsage {
-  daily_usage: DailyUsage[];
-  weekly_usage: WeeklyUsage[];
-  monthly_usage: MonthlyUsage[];
-  by_user: Record<string, UserDetailedUsage>;
-}
+
 interface UsageSummary {
   total_users: number;
   active_users_today: number;
@@ -61,34 +27,43 @@ interface UsageEntry {
   input_count?: number;
   extra_data?: Record<string, any>;
 }
+interface UsageResponse {
+  time_period: string; // 'day', 'week', 'month', etc.
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  request_count: number;
+}
+
 
 // Usage Statistics API endpoints
 export const usageApi = {
   // User endpoints
-  getUserUsageByPeriod: (period: 'day' | 'week' | 'month' | 'all', params?: {
-    days?: number;
-    weeks?: number;
-    months?: number;
-  }): Promise<UserDetailedUsage> => {
-    return api.get(`/usage/${period}`, { params });
+  getUserUsageByPeriod: (
+    time: 'day' | 'week' | 'month' | 'all',
+    period: Number = 7,
+    model: string = 'all',
+  ): Promise<UsageResponse[]> => {
+    return api.get(`/usage/${time}`, { params: { period, model } });
   },
 
   // Admin endpoints
-  getSpecificUserUsage: (username: string, period: 'day' | 'week' | 'month' | 'all', params?: {
-    days?: number;
-    weeks?: number;
-    months?: number;
-  }): Promise<UserDetailedUsage> => {
-    return api.get(`/admin/usage/user/${username}/${period}`, { params });
+  getSpecificUserUsage: (
+    username: string,
+    time: 'day' | 'week' | 'month' | 'all' = 'day',
+    period: Number = 7,
+    model: string = 'all',
+  ): Promise<UsageResponse[]> => {
+    return api.get(`/admin/usage/user/${username}/${time}`, { params: { period, model } });
   },
 
   // Get usage statistics for all users by period
-  getAllUsersUsage: (period: 'day' | 'week' | 'month' | 'all', params?: {
-    days?: number;
-    weeks?: number;
-    months?: number;
-  }): Promise<AllUsersUsage> => {
-    return api.get(`/admin/usage/all/${period}`, { params });
+  getAllUsersUsage: (
+    time: 'day' | 'week' | 'month' | 'all' = 'day',
+    period: Number = 7,
+    model: string = 'all',
+  ): Promise<UsageResponse[]> => {
+    return api.get(`/admin/usage/all/${time}`, { params: { period, model } });
   },
 
   // Admin summary
@@ -100,8 +75,8 @@ export const usageApi = {
   getUserApiRequestsByPeriod: (
     username: string,
     period: 'day' | 'week' | 'month' | 'all',
-    params?: { limit?: number }
+    limit: Number = 100,
   ): Promise<UsageEntry[]> => {
-    return api.get(`/admin/usage/list/user/${username}/${period}`, { params });
+    return api.get(`/admin/usage/list/user/${username}/${period}`, { params: { limit } });
   },
 };

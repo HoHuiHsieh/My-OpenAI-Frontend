@@ -3,20 +3,19 @@ import json
 import re
 import uuid
 import time
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 
 from fastapi import HTTPException
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 import numpy as np
+import tritonclient.grpc as grpcclient
 
 from logger import get_logger, UsageLogger
-from .typedef import (
-    ChatMessage, 
-    ChatCompletionChoice, 
+from ..typedef import (
+    ChatMessage,
+    ChatCompletionChoice,
     CreateChatCompletionResponse,
-    UsageInfo,
-    ToolCall,
-    ToolCallFunction
+    CreateChatCompletionRequest,
 )
 from .tool_calls import extract_tool_calls_from_text
 from .token_counter import create_usage_info
@@ -24,9 +23,14 @@ from .token_counter import create_usage_info
 # Set up logger for this module
 logger = get_logger(__name__)
 
-async def process_triton_response(triton_response: Any, model_name: str, request_data: dict = None, current_user=None, request=None) -> CreateChatCompletionResponse:
+
+async def prepare_chat_completion_response(
+    responses: List[grpcclient.InferResult],
+    body: CreateChatCompletionRequest,
+    text_input: str,
+) -> CreateChatCompletionResponse:
     """
-    Process the response from Triton Inference Server.
+    Prepare a ChatCompletionResponse from Triton Inference Server response.
 
     Args:
         triton_response: The response from Triton Inference Server
@@ -38,9 +42,68 @@ async def process_triton_response(triton_response: Any, model_name: str, request
     Returns:
         A formatted ChatCompletionResponse
     """
+    # Process all successful responses into a single response with multiple choices
+    completion_id = f"chatcmpl-{uuid.uuid4().hex}"
+    created_time = int(time.time())
+
+    all_choices: List[ChatCompletionChoice] = []
+    tool_calls_list = []
+
+    # Process each response text
+    for i, response_text in enumerate(responses):
+        synthetic_response = type('obj', (object,), {
+            'as_numpy': lambda name: np.array([response_text.encode('utf-8')])
+            if name == 'output' else None
+        })
+
+        # Process the individual response to get the choice
+        choice = await process_triton_response(synthetic_response, body.response_format.type, body.parallel_tool_calls)
+        choice.index = i  # Set the index for the choice
+        all_choices.append(choice)
+
+        # Collect tool calls for token counting
+        if choice.message and choice.message.tool_calls:
+            tool_calls_list.extend([t for t in choice.message.tool_calls])
+
+    # Get actual completions to count
+    completions: List[str] = []
+    for choice in all_choices:
+        if choice.message and isinstance(choice.message.content, str) and choice.message.content:
+            completions.append(choice.message.content)
+        elif choice.message and isinstance(choice.message.content, list):
+            # If content is a list, join it into a single string
+            completions.append(' '.join(choice.message.content))            
+
+    # Create an accurate usage info with token counting - use completion_id as request_id for independent tracking
+    usage = await create_usage_info(
+        model=body.model,
+        input_text=text_input,
+        completion=completions,
+        tool_calls=tool_calls_list if len(tool_calls_list) > 0 else None,
+        request_id=completion_id
+    )
+
+    # Create the final response
+    return CreateChatCompletionResponse(
+        id=completion_id,
+        created=created_time,
+        model=body.model,
+        choices=all_choices,
+        usage=usage
+    )
+
+
+async def process_triton_response(
+        response: grpcclient.InferResult,
+        response_format: Optional[str] = None,
+        parallel_tool_calls: Optional[bool] = True,
+) -> ChatCompletionChoice:
+    """
+    Process the response from Triton Inference Server.
+    """
     try:
         # Extract the output tensor data
-        output_tensor = triton_response.as_numpy("output")
+        output_tensor = response.as_numpy("output")
         if output_tensor is None:
             logger.error("Failed to get output tensor from Triton response")
             raise HTTPException(
@@ -60,11 +123,7 @@ async def process_triton_response(triton_response: Any, model_name: str, request
         response_text = response_text.strip()
 
         # Check if JSON format is required and ensure the response starts with '{'
-        if (request_data and request_data.get('response_format') and
-            (isinstance(request_data['response_format'], dict) and
-             request_data['response_format'].get('type') == 'json_object' or
-             hasattr(request_data['response_format'], 'type') and
-             request_data['response_format'].type == 'json_object')):
+        if (response_format == 'json_object'):
             # Ensure response starts with '{' for JSON format
             if not response_text.startswith('{'):
                 response_text = '{' + response_text
@@ -94,16 +153,20 @@ async def process_triton_response(triton_response: Any, model_name: str, request
                 pass
 
         # Check for ToolCall objects embedded in the response_text
-        tool_calls, cleaned_text, has_tool_calls = extract_tool_calls_from_text(response_text, parallel_tool_calls=request_data.get('parallel_tool_calls'))
-        
+        tool_calls, cleaned_text, has_tool_calls = extract_tool_calls_from_text(
+            response_text,
+            parallel_tool_calls=parallel_tool_calls
+        )
+
         if has_tool_calls:
             response_text = cleaned_text
             # Update finish_reason to tool_calls if we found tool calls
             finish_reason = "tool_calls"
-            logger.info(f"Extracted {len(tool_calls)} tool calls from response")
+            logger.info(
+                f"Extracted {len(tool_calls)} tool calls from response")
 
         # Create the ChatCompletionChoice
-        choice = ChatCompletionChoice(
+        return ChatCompletionChoice(
             index=0,
             message=ChatMessage(
                 role="assistant",
@@ -112,54 +175,6 @@ async def process_triton_response(triton_response: Any, model_name: str, request
             ),
             finish_reason=finish_reason
         )
-
-        # Get accurate token counts using the token_counter module
-        input_text = ""
-        if request_data and "messages" in request_data:
-            # Concatenate all messages for token counting
-            for msg in request_data.get("messages", []):
-                if isinstance(msg, dict):
-                    content = msg.get("content", "")
-                    if content:
-                        input_text += content + "\n"
-        
-        # Use the tool calls in token counting if present
-        tool_calls_list = tool_calls if has_tool_calls else None
-        # Get request_id if available to ensure independent token counting per request
-        request_id = str(request.state.request_id) if request and hasattr(request.state, "request_id") else None
-        usage = await create_usage_info(
-            model=model_name,
-            input_text=input_text,
-            completion=response_text,
-            tool_calls=tool_calls_list,
-            request_id=request_id
-        )
-
-        # Log usage information if user data is available
-        if current_user and hasattr(current_user, 'username'):
-            UsageLogger.log_chat_usage(
-                user_id=current_user.username,
-                model=model_name,
-                prompt_tokens=usage.prompt_tokens,
-                completion_tokens=usage.completion_tokens,
-                total_tokens=usage.total_tokens,
-                request_id=str(request.state.request_id) if request and hasattr(request.state, "request_id") else None,
-                extra={
-                    "endpoint": "/v1/chat/completion", 
-                    "stream": request_data.get("stream", False) if request_data else False,
-                    "has_tool_calls": has_tool_calls
-                }
-            )
-
-        # Create and return the full response
-        response = CreateChatCompletionResponse(
-            id=f"chatcmpl-{uuid.uuid4().hex}",
-            model=model_name,
-            choices=[choice],
-            usage=usage
-        )
-
-        return response
 
     except Exception as e:
         logger.error(f"Error processing Triton response: {str(e)}")

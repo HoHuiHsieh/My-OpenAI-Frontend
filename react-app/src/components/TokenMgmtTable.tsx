@@ -36,6 +36,7 @@ import {
   SelectChangeEvent,
   Checkbox,
   FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -77,32 +78,18 @@ const TokenMgmtTable: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Dialog states
-  const [openAddDialog, setOpenAddDialog] = useState<boolean>(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState<boolean>(false);
-  const [openTokenDialog, setOpenTokenDialog] = useState<boolean>(false);
 
   // Pagination state
   const [page, setPage] = useState<number>(0);
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
 
   // Form states
-  const [newToken, setNewToken] = useState<AccessTokenCreateData & { username: string }>({
-    username: '',
-    scopes: ['user'],
-    expires_days: 30,
-    never_expires: false,
-  });
-
   const [deleteTokenId, setDeleteTokenId] = useState<{ id: number; username: string }>({
     id: 0,
     username: '',
   });
-
-  const [generatedToken, setGeneratedToken] = useState<string>('');
-  const [isCopied, setIsCopied] = useState<boolean>(false);
-
-  // Available scopes for tokens
-  const availableScopes = ['user', 'admin', 'read', 'write', 'delete'];
+  const [showRevokedTokens, setShowRevokedTokens] = useState<boolean>(false);
 
   // Fetch tokens on component mount
   useEffect(() => {
@@ -124,40 +111,11 @@ const TokenMgmtTable: React.FC = () => {
     }
   };
 
-  // Handle add token form submission
-  const handleAddToken = async () => {
-    const { username, ...tokenData } = newToken;
-    try {
-      setLoading(true);
-      const response = await adminApi.createAccessToken(username, tokenData);
-      await fetchTokens(); // Refresh the token list
-      
-      // For demonstration purposes - in a real API, you'd get back the actual token
-      // Here I'm assuming the token would be returned or we can construct it
-      setGeneratedToken(`${response.id}-SAMPLE-TOKEN-${username}-${Math.random().toString(36).substring(2, 15)}`);
-      setOpenTokenDialog(true);
-      setOpenAddDialog(false);
-      
-      // Reset form
-      setNewToken({
-        username: '',
-        scopes: ['user'],
-        expires_days: 30,
-        never_expires: false,
-      });
-    } catch (err) {
-      setError('Failed to create token.');
-      console.error('Error creating token:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Handle delete token confirmation
   const handleDeleteToken = async () => {
     try {
       setLoading(true);
-      await adminApi.deleteAccessToken(deleteTokenId.username);
+      await adminApi.deleteAccessToken(deleteTokenId.username, deleteTokenId.id);
       await fetchTokens(); // Refresh the token list
       setOpenDeleteDialog(false);
       setDeleteTokenId({ id: 0, username: '' });
@@ -167,44 +125,6 @@ const TokenMgmtTable: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Copy token to clipboard
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedToken).then(
-      () => {
-        setIsCopied(true);
-        setTimeout(() => setIsCopied(false), 3000);
-      },
-      () => {
-        setError('Failed to copy token to clipboard.');
-      }
-    );
-  };
-
-  // Form change handlers
-  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewToken((prev) => ({ ...prev, username: e.target.value }));
-  };
-
-  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value);
-    setNewToken((prev) => ({ ...prev, expires_days: isNaN(value) ? 0 : value }));
-  };
-
-  const handleScopesChange = (event: SelectChangeEvent<string[]>) => {
-    const value = event.target.value as string[];
-    setNewToken((prev) => ({ ...prev, scopes: value }));
-  };
-
-  const handleNeverExpiresChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const checked = e.target.checked;
-    setNewToken((prev) => ({ 
-      ...prev, 
-      never_expires: checked,
-      // If "never expires" is checked, remove the expires_days property
-      ...(checked ? { expires_days: undefined } : {})
-    }));
   };
 
   // Pagination handlers
@@ -236,6 +156,18 @@ const TokenMgmtTable: React.FC = () => {
           Access Token Management
         </Typography>
         <Box>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showRevokedTokens}
+                onChange={(_, checked) => setShowRevokedTokens(checked)}
+                color="primary"
+                size="small"
+              />
+            }
+            label="Show Revoked"
+            sx={{ mr: 2 }}
+          />
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
@@ -243,14 +175,6 @@ const TokenMgmtTable: React.FC = () => {
             sx={{ mr: 1 }}
           >
             Refresh
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={() => setOpenAddDialog(true)}
-          >
-            Create Token
           </Button>
         </Box>
       </Box>
@@ -291,6 +215,7 @@ const TokenMgmtTable: React.FC = () => {
               </TableRow>
             ) : (
               tokens
+                .filter((token) => (showRevokedTokens ? true : !token.revoked))
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((token) => (
                   <TableRow key={token.id} hover>
@@ -344,124 +269,6 @@ const TokenMgmtTable: React.FC = () => {
         onPageChange={handleChangePage}
         onRowsPerPageChange={handleChangeRowsPerPage}
       />
-
-      {/* Create Token Dialog */}
-      <Dialog open={openAddDialog} onClose={() => setOpenAddDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create Access Token</DialogTitle>
-        <DialogContent>
-          <Box component="form" sx={{ mt: 1 }}>
-            <TextField
-              margin="dense"
-              id="username"
-              name="username"
-              label="Username"
-              type="text"
-              fullWidth
-              variant="outlined"
-              value={newToken.username}
-              onChange={handleUsernameChange}
-              required
-            />
-            <FormControl fullWidth margin="dense">
-              <InputLabel id="scopes-label">Scopes</InputLabel>
-              <Select
-                labelId="scopes-label"
-                id="scopes"
-                multiple
-                value={newToken.scopes}
-                onChange={handleScopesChange}
-                renderValue={(selected) => (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {selected.map((value) => (
-                      <Chip key={value} label={value} />
-                    ))}
-                  </Box>
-                )}
-              >
-                {availableScopes.map((scope) => (
-                  <MenuItem key={scope} value={scope}>
-                    {scope}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            
-            <FormControl fullWidth margin="dense">
-              <TextField
-                margin="dense"
-                id="expires_days"
-                name="expires_days"
-                label="Expires in (days)"
-                type="number"
-                fullWidth
-                variant="outlined"
-                value={newToken.expires_days || ''}
-                onChange={handleExpiryChange}
-                disabled={newToken.never_expires}
-              />
-            </FormControl>
-
-            <FormControl fullWidth margin="dense">
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={newToken.never_expires || false}
-                    onChange={handleNeverExpiresChange}
-                    name="never_expires"
-                  />
-                }
-                label="Never expires"
-              />
-            </FormControl>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenAddDialog(false)}>Cancel</Button>
-          <Button onClick={handleAddToken} variant="contained" color="primary">
-            Create Token
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Show Generated Token Dialog */}
-      <Dialog open={openTokenDialog} onClose={() => setOpenTokenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Access Token Created</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Your new access token has been created. Please copy this token now as you won't be able to see it again:
-          </DialogContentText>
-          <Box
-            sx={{
-              mt: 2,
-              p: 2,
-              backgroundColor: 'rgba(0, 0, 0, 0.09)',
-              borderRadius: 1,
-              fontFamily: 'monospace',
-              wordBreak: 'break-all',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Typography component="div" sx={{ flexGrow: 1 }}>
-              {generatedToken}
-            </Typography>
-            <IconButton onClick={copyToClipboard} color={isCopied ? 'success' : 'primary'} size="small">
-              {isCopied ? <CheckIcon /> : <CopyIcon />}
-            </IconButton>
-          </Box>
-          {isCopied && (
-            <Alert severity="success" sx={{ mt: 2 }}>
-              Token copied to clipboard!
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenTokenDialog(false)} variant="contained" color="primary">
-            Done
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Delete Token Confirmation Dialog */}
       <Dialog open={openDeleteDialog} onClose={() => setOpenDeleteDialog(false)}>

@@ -16,6 +16,7 @@ import {
   useTheme,
   Alert,
   CircularProgress,
+  Stack,
 } from '@mui/material';
 import Head from 'next/head';
 import Header from '@/components/Header';
@@ -29,6 +30,7 @@ import { usageApi } from '@/services/usage';
 import { adminApi } from '@/services/admin';
 // Import chart config to ensure Chart.js is properly set up
 import '../components/chart-config';
+import UsageStats from '@/components/UsageStats';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -157,35 +159,6 @@ export default function AdminPanel() {
   const usageChartRef = useRef<any>(null);
   const serviceChartRef = useRef<any>(null);
 
-  // State for API data
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // Initialize chart data with empty arrays to avoid null reference errors
-  const [usageData, setUsageData] = useState<any>({
-    labels: [],
-    datasets: [
-      {
-        label: 'API Calls',
-        data: [],
-        borderColor: 'rgb(53, 162, 235)',
-        backgroundColor: 'rgba(53, 162, 235, 0.5)',
-      }
-    ]
-  });
-  const [serviceData, setServiceData] = useState<any>({
-    labels: [],
-    datasets: [
-      {
-        label: 'Usage by Service',
-        data: [],
-        backgroundColor: [],
-      }
-    ]
-  });
-  const [userData, setUserData] = useState<any[]>([]);
-  // dashboardSummary state removed as it's now handled by UsageSummary component
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
-
   // Redirect non-admin users to homepage
   useEffect(() => {
     if (isAuthenticated && !hasScope('admin')) {
@@ -219,51 +192,6 @@ export default function AdminPanel() {
 
     };
   }, []);
-
-  // Load admin data when the component mounts
-  useEffect(() => {
-    if (isAuthenticated && hasScope('admin')) {
-      const loadAdminData = async () => {
-        try {
-          setLoading(true);
-          setError(null);
-
-          // Fetch usage statistics for the last 7 days
-          const usageResponse = await usageApi.getAllUsersUsage('day', { days: 7 });
-          // Transform the data to match expected format by the chart components
-          const transformedData = usageResponse.daily_usage || [];
-          setUsageData(transformUsageData(transformedData));
-          setServiceData(transformServiceData(transformedData));
-
-          // Fetch users list
-          const usersResponse = await adminApi.listUsers();
-          setUserData(usersResponse.map((user: any, index: number) => ({
-            id: index + 1,
-            username: user.username,
-            lastLogin: 'N/A', // Last login info isn't in the API
-            role: user.role === 'admin' ? 'Admin' : 'User',
-            status: user.disabled ? 'Inactive' : 'Active',
-            email: user.email,
-            full_name: user.full_name
-          })));
-
-          // Dashboard summary is now handled by the UsageSummary component
-
-          // Fetch recent activity (using admin user activity as a placeholder)
-          const activityResponse = await usageApi.getUserApiRequestsByPeriod('admin', 'day', { limit: 10 });
-          setRecentActivity(activityResponse);
-
-        } catch (err) {
-          console.error('Failed to load admin data:', err);
-          setError('Failed to load admin data. Please try refreshing the page.');
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      loadAdminData();
-    }
-  }, [isAuthenticated, hasScope]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -303,45 +231,18 @@ export default function AdminPanel() {
           </Box>
 
           <TabPanel value={tabValue} index={0}>
-            {loading ? (
-              <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-                <CircularProgress />
-              </Box>
-            ) : error ? (
-              <Alert severity="error" sx={{ mb: 3 }}>
-                {error}
-              </Alert>
-            ) : (
+            <Stack direction="column" spacing={2} sx={{ mb: 4 }}>
               <UsageSummary refreshInterval={300000} />
-            )}
+              <UsageStats useAdminPanel={true} />
+            </Stack>
           </TabPanel>
 
           <TabPanel value={tabValue} index={1}>
-            {loading ? (
-              <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-                <CircularProgress />
-              </Box>
-            ) : error ? (
-              <Alert severity="error" sx={{ mb: 3 }}>
-                {error}
-              </Alert>
-            ) : (
-              <UserMgmtTable />
-            )}
+            <UserMgmtTable />
           </TabPanel>
 
           <TabPanel value={tabValue} index={2}>
-            {loading ? (
-              <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-                <CircularProgress />
-              </Box>
-            ) : error ? (
-              <Alert severity="error" sx={{ mb: 3 }}>
-                {error}
-              </Alert>
-            ) : (
-              <TokenMgmtTable />
-            )}
+            <TokenMgmtTable />
           </TabPanel>
         </Paper>
       </Container>

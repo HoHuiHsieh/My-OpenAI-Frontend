@@ -37,7 +37,7 @@ app = FastAPI(
 
 
 @app.get("/", response_model=CreateModelListResponse, summary="List available models")
-async def models_root(current_user: User = Security(get_current_active_user, scopes=["models:read"])):
+async def models_root(current_user: User = Security(get_current_active_user, scopes=[])):
     """
     List all available models from configured model providers.
 

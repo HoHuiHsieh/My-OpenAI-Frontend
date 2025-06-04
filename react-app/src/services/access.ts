@@ -35,4 +35,9 @@ export const accessApi = {
     getTokenStatus: (body: TokenRequest): Promise<TokenInfo> => {
         return api.post('/access/info', body);
     },
+
+    getModels: async (): Promise<string[]> => {
+        const res = await api.get('/v1/models');
+        return res.data.map((m: { id: string; }) => m.id.split('/').at(-1));
+    }
 }

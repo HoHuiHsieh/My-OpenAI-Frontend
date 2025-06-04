@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Database access and query functions for statistics.
 
@@ -6,8 +7,8 @@ and analyzing usage statistics from the logging database.
 """
 
 import traceback
-from datetime import datetime, timedelta, date
-from typing import Dict, List, Optional, Any, Union
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional, Any, Union, Literal
 import psycopg2
 import psycopg2.extras
 from psycopg2 import sql
@@ -15,6 +16,8 @@ from config import get_config
 from logger import get_logger
 from oauth2.db import get_db
 from oauth2.db.operations import get_all_users
+from .models import UsageResponse
+
 
 # Initialize the enhanced logging system
 logger = get_logger(__name__)
@@ -42,182 +45,6 @@ def get_db_connection():
     except Exception as e:
         logger.error(f"Failed to connect to database: {str(e)}")
         raise
-
-
-def get_daily_usage(user_id: Optional[Union[str, int]] = None, days: int = 7) -> List[Dict]:
-    """
-    Get daily usage statistics for a user or all users.
-
-    Args:
-        user_id: Optional user ID to filter by (will be converted to string)
-        days: Number of days to retrieve data for
-
-    Returns:
-        List of daily usage data
-    """
-    connection = None
-    try:
-        connection = get_db_connection()
-
-        # Calculate the date range
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=days-1)
-
-        query = sql.SQL("""
-            SELECT 
-                DATE(timestamp) as date,
-                SUM(prompt_tokens) as prompt_tokens,
-                SUM(COALESCE(completion_tokens, 0)) as completion_tokens,
-                SUM(total_tokens) as total_tokens,
-                COUNT(*) as request_count
-            FROM {table}
-            WHERE timestamp >= %s AND timestamp < %s + INTERVAL '1 day'
-        """)
-
-        # Add user filter if specified
-        params = [start_date, end_date]
-        if user_id:
-            query = sql.SQL(query.as_string(connection) + " AND user_id = %s")
-            params.append(str(user_id))  # Ensure user_id is a string
-
-        # Group by date and order by date
-        query = sql.SQL(query.as_string(connection) +
-                        " GROUP BY date ORDER BY date")
-
-        # Format query with table name
-        query = query.format(table=sql.Identifier(usage_table))
-
-        with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-            cursor.execute(query, params)
-            results = cursor.fetchall()
-
-        return [dict(row) for row in results]
-
-    except Exception as e:
-        logger.error(f"Error getting daily usage: {str(e)}")
-        logger.error(traceback.format_exc())
-        return []
-    finally:
-        if connection:
-            connection.close()
-
-
-def get_weekly_usage(user_id: Optional[Union[str, int]] = None, weeks: int = 4) -> List[Dict]:
-    """
-    Get weekly usage statistics for a user or all users.
-
-    Args:
-        user_id: Optional user ID to filter by (will be converted to string)
-        weeks: Number of weeks to retrieve data for
-
-    Returns:
-        List of weekly usage data
-    """
-    connection = None
-    try:
-        connection = get_db_connection()
-
-        # Calculate the date range
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(weeks=weeks)
-
-        query = sql.SQL("""
-            SELECT 
-                DATE_TRUNC('week', timestamp) as week_start,
-                DATE_TRUNC('week', timestamp) + INTERVAL '6 days' as week_end,
-                SUM(prompt_tokens) as prompt_tokens,
-                SUM(COALESCE(completion_tokens, 0)) as completion_tokens,
-                SUM(total_tokens) as total_tokens,
-                COUNT(*) as request_count
-            FROM {table}
-            WHERE timestamp >= %s AND timestamp <= %s
-        """)
-
-        # Add user filter if specified
-        params = [start_date, end_date]
-        if user_id:
-            query = sql.SQL(query.as_string(connection) + " AND user_id = %s")
-            params.append(str(user_id))  # Ensure user_id is a string
-
-        # Group by week and order by week
-        query = sql.SQL(query.as_string(connection) +
-                        " GROUP BY week_start, week_end ORDER BY week_start")
-
-        # Format query with table name
-        query = query.format(table=sql.Identifier(usage_table))
-
-        with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-            cursor.execute(query, params)
-            results = cursor.fetchall()
-
-        return [dict(row) for row in results]
-
-    except Exception as e:
-        logger.error(f"Error getting weekly usage: {str(e)}")
-        logger.error(traceback.format_exc())
-        return []
-    finally:
-        if connection:
-            connection.close()
-
-
-def get_monthly_usage(user_id: Optional[Union[str, int]] = None, months: int = 6) -> List[Dict]:
-    """
-    Get monthly usage statistics for a user or all users.
-
-    Args:
-        user_id: Optional user ID to filter by (will be converted to string)
-        months: Number of months to retrieve data for
-
-    Returns:
-        List of monthly usage data
-    """
-    connection = None
-    try:
-        connection = get_db_connection()
-
-        # Calculate the date range
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=30 * months)
-
-        query = sql.SQL("""
-            SELECT 
-                EXTRACT(YEAR FROM timestamp) as year,
-                EXTRACT(MONTH FROM timestamp) as month,
-                SUM(prompt_tokens) as prompt_tokens,
-                SUM(COALESCE(completion_tokens, 0)) as completion_tokens,
-                SUM(total_tokens) as total_tokens,
-                COUNT(*) as request_count
-            FROM {table}
-            WHERE timestamp >= %s AND timestamp <= %s
-        """)
-
-        # Add user filter if specified
-        params = [start_date, end_date]
-        if user_id:
-            query = sql.SQL(query.as_string(connection) + " AND user_id = %s")
-            params.append(str(user_id))  # Ensure user_id is a string
-
-        # Group by month and year, order by year and month
-        query = sql.SQL(query.as_string(connection) +
-                        " GROUP BY year, month ORDER BY year, month")
-
-        # Format query with table name
-        query = query.format(table=sql.Identifier(usage_table))
-
-        with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-            cursor.execute(query, params)
-            results = cursor.fetchall()
-
-        return [dict(row) for row in results]
-
-    except Exception as e:
-        logger.error(f"Error getting monthly usage: {str(e)}")
-        logger.error(traceback.format_exc())
-        return []
-    finally:
-        if connection:
-            connection.close()
 
 
 def get_user_request_list(user_id: Union[str, int], period: str = "day", limit: int = 100) -> List[Dict]:
@@ -351,6 +178,174 @@ def get_usage_summary() -> Dict:
             "requests_today": 0,
             "tokens_today": 0
         }
+    finally:
+        if connection:
+            connection.close()
+
+
+def get_usage(
+        user_id: Optional[Union[str, int]] = None,
+        time: Optional[Literal['day', 'week', 'month', 'all']] = 'all',
+        period: Optional[int] = 7,
+        model: Optional[str] = 'all'
+) -> List[UsageResponse]:
+    """
+    Get usage statistics for a user or all users.
+
+    Args:
+        user_id: Optional user ID to filter by (will be converted to string)
+        time: Time period to filter by (day, week, month, all)
+        period: Number of days/weeks/months to retrieve data for
+        model: Optional model name to filter by (default: 'all')
+
+    Returns:
+        List of usage statistics dictionaries based on specified parameters
+    """
+    connection = None
+    try:
+        connection = get_db_connection()
+
+        # Define UTC+8 timezone
+        tz_utc8 = timezone(timedelta(hours=8))
+        
+        # Calculate the date range using UTC+8
+        end_date = datetime.now(tz=tz_utc8).date() + timedelta(days=1)  # Include today
+
+        # Determine start date based on time period
+        if time == 'day':
+            # For daily stats, we look back 'period' number of days
+            start_date = end_date - timedelta(days=period-1)
+            date_trunc = "DATE(timestamp)"
+            group_by = "DATE(timestamp)"
+
+        elif time == 'week':
+            # For weekly stats, we look back 'period' number of weeks
+            start_date = end_date - timedelta(weeks=period)
+            date_trunc = "DATE_TRUNC('week', timestamp)"
+            group_by = "DATE_TRUNC('week', timestamp)"
+
+        elif time == 'month':
+            # For monthly stats, we look back 'period' number of months
+            start_date = end_date - timedelta(days=30 * period)
+            date_trunc = "DATE_TRUNC('month', timestamp)"
+            group_by = "DATE_TRUNC('month', timestamp)"
+
+        else:  # 'all' or any other value
+            # Default to looking back 365 days if not specified otherwise
+            start_date = end_date - timedelta(days=365)
+            date_trunc = None  # No grouping by time for 'all'
+            group_by = None
+
+        # Base query construction
+        if model != 'all':
+            # If a specific model is requested, group by time period (if specified)
+            if date_trunc:
+                query = sql.SQL("""
+                    SELECT
+                        {date_trunc} as time_period,
+                        SUM(prompt_tokens) as prompt_tokens,
+                        SUM(COALESCE(completion_tokens, 0)) as completion_tokens,
+                        SUM(total_tokens) as total_tokens,
+                        COUNT(*) as request_count
+                    FROM {table}
+                    WHERE model = %s AND timestamp >= %s AND timestamp <= %s
+                """).format(
+                    date_trunc=sql.SQL(date_trunc),
+                    table=sql.Identifier(usage_table)
+                )
+                params = [model, start_date, end_date]
+            else:
+                # If no time grouping ('all'), just get aggregated stats for the model
+                query = sql.SQL("""
+                    SELECT
+                        model,
+                        SUM(prompt_tokens) as prompt_tokens,
+                        SUM(COALESCE(completion_tokens, 0)) as completion_tokens,
+                        SUM(total_tokens) as total_tokens,
+                        COUNT(*) as request_count
+                    FROM {table}
+                    WHERE model = %s AND timestamp >= %s AND timestamp <= %s
+                """).format(table=sql.Identifier(usage_table))
+                params = [model, start_date, end_date]
+        else:
+            # If no specific model is requested
+            if time == 'all':
+                # Group by model
+                query = sql.SQL("""
+                    SELECT
+                        model,
+                        SUM(prompt_tokens) as prompt_tokens,
+                        SUM(COALESCE(completion_tokens, 0)) as completion_tokens,
+                        SUM(total_tokens) as total_tokens,
+                        COUNT(*) as request_count
+                    FROM {table}
+                    WHERE timestamp >= %s AND timestamp <= %s
+                """).format(table=sql.Identifier(usage_table))
+                params = [start_date, end_date]
+
+                # Add user filter if specified
+                if user_id:
+                    query = sql.SQL(query.as_string(
+                        connection) + " AND user_id = %s")
+                    params.append(str(user_id))  # Ensure user_id is a string
+
+                # Group by model
+                query = sql.SQL(query.as_string(connection) +
+                                " GROUP BY model ORDER BY total_tokens DESC")
+            else:
+                # Group by time period
+                query = sql.SQL("""
+                    SELECT
+                        {date_trunc} as time_period,
+                        SUM(prompt_tokens) as prompt_tokens,
+                        SUM(COALESCE(completion_tokens, 0)) as completion_tokens,
+                        SUM(total_tokens) as total_tokens,
+                        COUNT(*) as request_count
+                    FROM {table}
+                    WHERE timestamp >= %s AND timestamp <= %s
+                """).format(
+                    date_trunc=sql.SQL(date_trunc),
+                    table=sql.Identifier(usage_table)
+                )
+                params = [start_date, end_date]
+
+        # Add user filter if specified and not already added
+        if user_id and 'user_id' not in query.as_string(connection):
+            query = sql.SQL(query.as_string(connection) + " AND user_id = %s")
+            params.append(str(user_id))  # Ensure user_id is a string
+
+        # Add group by and order by clauses if not already added and if time grouping is needed
+        if group_by and 'GROUP BY' not in query.as_string(connection):
+            query = sql.SQL(query.as_string(connection) +
+                            f" GROUP BY {group_by} ORDER BY {group_by}")
+        elif 'GROUP BY' not in query.as_string(connection) and time == 'all':
+            # For 'all' with no specific model, we've already set up the grouping by model above
+            pass
+
+        with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+            print(results)
+
+        # Format results
+        formatted_results = []
+        for row in results:
+            result_dict = dict(row)
+            
+            # Format time_period if it exists
+            if 'time_period' in result_dict and result_dict['time_period']:
+                # Always format as YYYY-MM-DD for day, week, and month
+                result_dict['time_period'] = result_dict['time_period'].strftime(
+                    '%Y-%m-%d')
+
+            formatted_results.append(result_dict)
+
+        return formatted_results
+
+    except Exception as e:
+        logger.error(f"Error getting usage statistics: {str(e)}")
+        logger.error(traceback.format_exc())
+        return []
     finally:
         if connection:
             connection.close()

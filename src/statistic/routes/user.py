@@ -4,26 +4,22 @@ User usage statistics routes.
 This module defines the endpoints for retrieving usage statistics for the current user.
 """
 
-from typing import List, Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import SecurityScopes
 from oauth2 import get_current_active_user, User
-from oauth2.scopes import Scopes
-
 from .. import operations as ops
 from .. import models
 
 router = APIRouter()
 
 
-@router.get("/usage/{period}", 
-           response_model=models.UserDetailedUsage,
+@router.get("/usage/{time}", 
+           response_model=List[models.UsageResponse],
            summary="Get usage statistics for the current user")
 async def get_user_usage(
-    period: str,
-    days: Optional[int] = 7,
-    weeks: Optional[int] = 4,
-    months: Optional[int] = 6,
+    time: Optional[str] = "all",
+    period: Optional[int] = 7,
+    model: Optional[str] = "all",
     current_user: User = Depends(get_current_active_user),
 ):
     """
@@ -44,28 +40,18 @@ async def get_user_usage(
     """
     # Validate period
     valid_periods = ["day", "week", "month", "all"]
-    if period not in valid_periods:
+    if time not in valid_periods:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid period. Must be one of {', '.join(valid_periods)}"
+            detail=f"Invalid time. Must be one of {', '.join(valid_periods)}"
         )
     
-    # Adjust parameters based on the requested period
-    if period == "day":
-        weeks = 0
-        months = 0
-    elif period == "week":
-        days = 0
-        months = 0
-    elif period == "month":
-        days = 0
-        weeks = 0
-        
-    # Get usage data for the user
-    return ops.get_user_detailed_usage(
-        user_id=current_user.id,
-        username=current_user.username,
-        days=days,
-        weeks=weeks,
-        months=months
+    # Get user by username
+    
+    # Get usage data for all users
+    return ops.get_usage_data(
+        user_id=current_user.id if hasattr(current_user, 'id') and current_user.id else None,
+        time=time,
+        period=period,
+        model=model,
     )

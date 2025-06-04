@@ -234,8 +234,8 @@ async def create_new_user(
 
 @admin_router.put("/users/{username}", response_model=UserResponse)
 async def update_user_info(
-    username: str = Path(..., description="Username of the user to update"),
-    user_data: UserUpdate = Depends(),
+    username: str,
+    user_data: UserUpdate,    
     token_data: Dict[str, Any] = Security(verify_scopes, scopes=["admin"]),
     db: Session = Depends(get_db)
 ):
@@ -254,6 +254,7 @@ async def update_user_info(
     Raises:
         HTTPException: If user update fails
     """
+    print(username, user_data)
     
     # Check if user exists
     existing_user = get_user_by_username(db, username)
@@ -266,7 +267,8 @@ async def update_user_info(
     
     # Prepare update data
     update_data = user_data.dict(exclude_unset=True)
-      # Update user
+
+    # Update user
     user = update_user(
         db=db,
         username=username,
@@ -329,7 +331,14 @@ async def delete_user_account(
         )
     
     # Delete user
-    success = delete_user(db=db, username=username)
+    update_data = {
+        "disabled": True,  # Disable the user instead of deleting immediately
+    }
+    success = update_user(
+        db=db,
+        username=username,
+        update_data=update_data
+    )
     if not success:
         logger.error(f"Admin {admin_username} failed to delete user: {username}")
         raise HTTPException(
@@ -483,7 +492,7 @@ async def revoke_access_token(
     Raises:
         HTTPException: If token revocation fails
     """
-    
+    print(f"Revoke access token for user: {username}, token_id: {token_id}")
     # Check if user exists
     user = get_user_by_username(db, username)
     if user is None:

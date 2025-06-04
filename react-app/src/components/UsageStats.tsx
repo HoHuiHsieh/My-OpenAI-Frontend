@@ -13,6 +13,7 @@ import { Box, Paper, Typography, CircularProgress, Alert, FormControl, Select, M
 import { Line } from 'react-chartjs-2';
 import { useAuth } from '@/context/AuthContext';
 import { usageApi } from '@/services/usage';
+import { accessApi } from '@/services/access';
 // Import chart config to ensure Chart.js is properly set up
 import '../components/chart-config';
 
@@ -22,6 +23,8 @@ import '../components/chart-config';
  * @property className - Optional CSS class name for styling the component.
  */
 interface UsageStatsProps {
+    useAdminPanel?: boolean;
+    username?: string;
     className?: string;
 }
 
@@ -31,7 +34,7 @@ interface UsageStatsProps {
  * @param param0 
  * @returns 
  */
-const UsageStats: React.FC<UsageStatsProps> = ({ className }) => {
+const UsageStats: React.FC<UsageStatsProps> = ({ useAdminPanel, username, className }) => {
     const { isAuthenticated, user } = useAuth();
     const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
     const [loading, setLoading] = useState(false);
@@ -58,6 +61,8 @@ const UsageStats: React.FC<UsageStatsProps> = ({ className }) => {
         ]
     });
     const [numPeriods, setNumPeriods] = useState(7);
+    const [models, setModels] = useState<string[]>([]);
+    const [selectedModel, setSelectedModel] = useState<string>('all');
 
     // Create a cleanup function to destroy the chart when component unmounts
     useEffect(() => {
@@ -75,11 +80,31 @@ const UsageStats: React.FC<UsageStatsProps> = ({ className }) => {
         };
     }, []);
 
+    // Fetch available models when component mounts
+    useEffect(() => {
+        const fetchModels = async () => {
+            try {
+                const response = await accessApi.getModels();
+                if (response && Array.isArray(response)) {
+                    // Extract unique model names from the response
+                    const modelNames = response;
+                    setModels(modelNames);
+                }
+            } catch (error) {
+                console.error('Failed to fetch models:', error);
+            }
+        };
+
+        if (isAuthenticated) {
+            fetchModels();
+        }
+    }, [isAuthenticated]);
+
     useEffect(() => {
         if (isAuthenticated && user) {
             fetchUsageData();
         }
-    }, [isAuthenticated, user, period, numPeriods]);
+    }, [isAuthenticated, user, period, numPeriods, selectedModel]);
 
     // Effect to update chart when data changes
     useEffect(() => {
@@ -96,24 +121,13 @@ const UsageStats: React.FC<UsageStatsProps> = ({ className }) => {
             setError(null);
 
             try {
-                // Map numPeriods to the correct param for the API
-                let params: any = {};
-                if (period === 'day') params.days = numPeriods;
-                else if (period === 'week') params.weeks = numPeriods;
-                else if (period === 'month') params.months = numPeriods;
+                const response = !useAdminPanel
+                    ? await usageApi.getUserUsageByPeriod(period, numPeriods, selectedModel)
+                    : username
+                        ? await usageApi.getSpecificUserUsage(username, period, numPeriods, selectedModel)
+                        : await usageApi.getAllUsersUsage(period, numPeriods, selectedModel)
 
-                const response = await usageApi.getUserUsageByPeriod(period, params);
-                
-                let dataArr: any[] = [];
-                if (period === 'day') {
-                    dataArr = response.daily_usage || [];
-                } else if (period === 'week') {
-                    dataArr = response.weekly_usage || [];
-                } else if (period === 'month') {
-                    dataArr = response.monthly_usage || [];
-                }
-
-                if (!dataArr || dataArr.length === 0) {
+                if (!response || response.length === 0) {
                     setUsageData({
                         labels: [],
                         datasets: [
@@ -124,39 +138,88 @@ const UsageStats: React.FC<UsageStatsProps> = ({ className }) => {
                     return;
                 }
 
-                // Sort by date/period
-                let sortedData = [...dataArr];
-                if (period === 'day') {
-                    sortedData.sort((a, b) =>
-                        new Date(a.date).getTime() - new Date(b.date).getTime()
+                // Sort by time_period which should be a date string
+                let sortedData = [...response].sort((a, b) => {
+                    return new Date(a.time_period).getTime() - new Date(b.time_period).getTime();
+                });
+
+                // Add padding data to ensure we have numPeriods worth of data points
+                if (sortedData.length < numPeriods) {
+                    // Create a map of existing dates for quick lookup
+                    const existingDates = new Map(
+                        sortedData.map(item => [item.time_period, true])
                     );
-                } else if (period === 'week') {
-                    sortedData.sort((a, b) =>
-                        new Date(a.week_start).getTime() - new Date(b.week_start).getTime()
-                    );
-                } else if (period === 'month') {
-                    sortedData.sort((a, b) =>
-                        a.year !== b.year ? a.year - b.year : a.month - b.month
-                    );
+
+                    // Generate expected dates based on period
+                    const paddedData = [...sortedData];
+                    const today = new Date();
+
+                    // Go back numPeriods and generate all expected dates
+                    for (let i = 0; i < numPeriods; i++) {
+                        let date = new Date();
+
+                        if (period === 'day') {
+                            date.setDate(today.getDate() - i);
+                            // Reset to start of day
+                            date.setHours(0, 0, 0, 0);
+                        } else if (period === 'week') {
+                            // Go back i weeks
+                            date.setDate(today.getDate() - (i * 7));
+                            // Adjust to week start (Sunday)
+                            const dayOfWeek = date.getDay();
+                            date.setDate(date.getDate() - dayOfWeek);
+                            date.setHours(0, 0, 0, 0);
+                        } else if (period === 'month') {
+                            // Go back i months
+                            date.setMonth(today.getMonth() - i);
+                            // Set to first day of month
+                            date.setDate(1);
+                            date.setHours(0, 0, 0, 0);
+                        }
+
+                        const dateString = date.toISOString().split('T')[0];
+
+                        // If this date isn't in our results, add a zero-value entry
+                        if (!existingDates.has(dateString)) {
+                            paddedData.push({
+                                time_period: dateString,
+                                prompt_tokens: 0,
+                                completion_tokens: 0,
+                                total_tokens: 0,
+                                request_count: 0
+                            });
+                        }
+                    }
+
+                    // Re-sort with the padded data
+                    sortedData = paddedData.sort((a, b) => {
+                        return new Date(a.time_period).getTime() - new Date(b.time_period).getTime();
+                    });
+
+                    // Limit to numPeriods most recent entries
+                    if (sortedData.length > numPeriods) {
+                        sortedData = sortedData.slice(-numPeriods);
+                    }
                 }
 
                 setUsageData({
                     labels: sortedData.map(item => {
+                        const date = new Date(item.time_period);
                         if (period === 'day') {
-                            const date = new Date(item.date);
                             return date.toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
                                 year: 'numeric'
                             });
                         } else if (period === 'week') {
-                            const start = new Date(item.week_start);
-                            const end = new Date(item.week_end);
-                            return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                            // Assuming time_period is the start of the week
+                            const endDate = new Date(date);
+                            endDate.setDate(date.getDate() + 6);
+                            return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
                         } else if (period === 'month') {
-                            return `${item.year}-${String(item.month).padStart(2, '0')}`;
+                            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
                         }
-                        return '';
+                        return item.time_period;
                     }),
                     datasets: [
                         {
@@ -192,6 +255,10 @@ const UsageStats: React.FC<UsageStatsProps> = ({ className }) => {
         setNumPeriods(parseInt(event.target.value as string, 10));
     };
 
+    const handleModelChange = (event: SelectChangeEvent<string>) => {
+        setSelectedModel(event.target.value);
+    };
+
     if (!isAuthenticated || !user) {
         return null;
     }
@@ -199,7 +266,9 @@ const UsageStats: React.FC<UsageStatsProps> = ({ className }) => {
     return (
         <Paper elevation={2} sx={{ p: 3, className }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">Your API Usage</Typography>
+                <Typography variant="h6">
+                    {!useAdminPanel ? 'Your API Usage': username ? `${username}'s API Usage` : 'All Users API Usage'}
+                </Typography>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                     <FormControl size="small">
                         <Select value={period} onChange={handlePeriodChange}>
@@ -216,6 +285,21 @@ const UsageStats: React.FC<UsageStatsProps> = ({ className }) => {
                             <MenuItem value="30">Last 30</MenuItem>
                             <MenuItem value="60">Last 60</MenuItem>
                             <MenuItem value="90">Last 90</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <FormControl size="small">
+                        <InputLabel>Model</InputLabel>
+                        <Select
+                            value={selectedModel}
+                            onChange={handleModelChange}
+                            label="Model"
+                        >
+                            <MenuItem value="all">All Models</MenuItem>
+                            {models.map((model) => (
+                                <MenuItem key={model} value={model}>
+                                    {model}
+                                </MenuItem>
+                            ))}
                         </Select>
                     </FormControl>
                 </Box>

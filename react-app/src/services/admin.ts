@@ -46,10 +46,18 @@ interface AccessTokenResponse {
   created_at: string; // ISO format date of creation
 }
 
+// New interface for token creation response
+interface AccessTokenCreateResponse {
+  access_token: string; // The actual token string
+  token_type: string; // Always "bearer"
+  expires_at?: string; // Optional, ISO format date of expiration
+  scopes: string[]; // List of scopes granted by the token
+}
+
 // Admin User Management API endpoints
 export const adminApi = {
-  listUsers: (): Promise<UserResponse[]> => {
-    return api.get('/admin/users');
+  listUsers: (skip: number = 0, limit: number = 100): Promise<UserResponse[]> => {
+    return api.get('/admin/users', { params: { skip, limit } });
   },
 
   getUser: (username: string): Promise<UserResponse> => {
@@ -72,12 +80,12 @@ export const adminApi = {
     return api.get(`/admin/access`);
   },
 
-  createAccessToken: (username: string, tokenData: AccessTokenCreateData): Promise<AccessTokenResponse> => {
+  createAccessToken: (username: string, tokenData: AccessTokenCreateData): Promise<AccessTokenCreateResponse> => {
     return api.post(`/admin/access/${username}`, tokenData);
   },
 
-  deleteAccessToken: (username: string): Promise<void> => {
-    return api.delete(`/admin/access/${username}`);
+  deleteAccessToken: (username: string, token_id: number): Promise<void> => {
+    return api.delete(`/admin/access/${username}`, { params: { token_id } });
   }
 };
 

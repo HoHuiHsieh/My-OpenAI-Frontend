@@ -7,16 +7,10 @@ functionality for scope management.
 
 from typing import Dict, List, Set
 from enum import Enum, auto
-from config import get_config
 from logger import get_logger
 
 # Initialize logger
 logger = get_logger(__name__)
-
-# Load configuration
-config = get_config()
-oauth2_config = config.get("oauth2", {})
-
 
 class Scopes(str, Enum):
     """Enumeration of available API scopes."""
@@ -26,13 +20,23 @@ class Scopes(str, Enum):
     EMBEDDINGS_READ = "embeddings:read"
 
 
-# Get available scopes from config or use defaults
-available_scopes = oauth2_config.get("scopes", [
+# Get available scopes
+available_scopes = [
     Scopes.ADMIN,
     Scopes.MODELS_READ,
     Scopes.CHAT_READ,
     Scopes.EMBEDDINGS_READ
-])
+]
+
+# Define admin scopes
+admin_scopes = available_scopes
+
+# Define user scopes
+user_scopes = [
+    Scopes.MODELS_READ,
+    Scopes.CHAT_READ,
+    Scopes.EMBEDDINGS_READ
+]
 
 # Map of scope to description for documentation
 scope_descriptions: Dict[str, str] = {

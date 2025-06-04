@@ -43,8 +43,10 @@ import {
   Delete as DeleteIcon,
   VpnKey as VpnKeyIcon,
   Refresh as RefreshIcon,
+  Dashboard,
 } from '@mui/icons-material';
 import { adminApi } from '@/services/admin';
+import UsageStats from './UsageStats';
 
 // Types from admin API
 interface UserCreate {
@@ -90,6 +92,7 @@ const UserMgmtTable: React.FC<{}> = () => {
   const [users, setUsers] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [showInactive, setShowInactive] = useState<boolean>(false);
 
   // Pagination state
   const [page, setPage] = useState<number>(0);
@@ -127,12 +130,18 @@ const UserMgmtTable: React.FC<{}> = () => {
 
   const [deleteUsername, setDeleteUsername] = useState<string>('');
 
+  const [dashboardUsername, setDashboardUsername] = useState<string>('all');
+
+  const openDashboard = (username: string) => {
+    setDashboardUsername(username);
+  }
+
   // Fetch users from API
   const fetchUsers = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await adminApi.listUsers();
+      const response = await adminApi.listUsers(0, 100); // Add explicit pagination parameters
       setUsers(response);
     } catch (err) {
       setError('Failed to load users. Please try again later.');
@@ -227,20 +236,6 @@ const UserMgmtTable: React.FC<{}> = () => {
     }
   };
 
-  // Handle toggle user activation
-  const handleToggleActive = async (username: string, currentStatus: boolean) => {
-    try {
-      setLoading(true);
-      await adminApi.updateUser(username, { disabled: !currentStatus });
-      await fetchUsers(); // Refresh the user list
-    } catch (err) {
-      setError(`Failed to ${currentStatus ? 'disable' : 'activate'} user.`);
-      console.error('Error toggling user status:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Pagination handlers
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
@@ -313,6 +308,17 @@ const UserMgmtTable: React.FC<{}> = () => {
           User Management
         </Typography>
         <Box>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showInactive}
+                onChange={(_, checked) => setShowInactive(checked)}
+                color="primary"
+              />
+            }
+            label="Show Inactive Users"
+            sx={{ mr: 2 }}
+          />
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
@@ -369,6 +375,7 @@ const UserMgmtTable: React.FC<{}> = () => {
               </TableRow>
             ) : (
               users
+                .filter((user) => showInactive || !user.disabled)
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((user) => (
                   <TableRow key={user.username} hover>
@@ -412,6 +419,14 @@ const UserMgmtTable: React.FC<{}> = () => {
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
+                        <Tooltip title="Dashboard">
+                          <IconButton
+                            onClick={() => openDashboard(user.username)}
+                            size="small"
+                          >
+                            <Dashboard fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -430,6 +445,21 @@ const UserMgmtTable: React.FC<{}> = () => {
         onPageChange={handleChangePage}
         onRowsPerPageChange={handleChangeRowsPerPage}
       />
+
+      {/* Usage Stats Component */}
+      <Box
+        sx={{
+          mt: 4,
+          mb: 0,
+          border: 1,
+          borderColor: 'divider',
+          borderRadius: 2,
+          backgroundColor: 'background.paper',
+          boxShadow: 10,
+        }}
+      >
+        <UsageStats useAdminPanel={true} username={dashboardUsername} />
+      </Box>
 
       {/* Add User Dialog */}
       <Dialog open={openAddDialog} onClose={() => setOpenAddDialog(false)} maxWidth="sm" fullWidth>

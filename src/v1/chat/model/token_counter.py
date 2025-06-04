@@ -8,15 +8,13 @@ separately per API call without accumulating across requests.
 """
 import numpy as np
 import asyncio
-import functools
-from typing import List, Optional, Dict, Union, Any, Tuple
-import json
+from typing import List, Optional, Union
 import uuid
 
 import tritonclient.grpc as grpcclient
 from logger import get_logger
 from config import get_config
-from .typedef import UsageInfo, ToolCall
+from ..typedef import UsageInfo, ToolCall
 
 # Set up logger for this module
 logger = get_logger(__name__)
