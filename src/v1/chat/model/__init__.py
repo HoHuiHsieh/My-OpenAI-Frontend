@@ -125,7 +125,7 @@ class TritonConnection():
         # Create callbacks for each parallel request
         clients = []
         # Get the number of parallel requests from the body
-        num_parallel_requests = body.n
+        num_parallel_requests = body.n if hasattr(body, 'n') and body.n > 1 else 1
 
         # Start all the parallel requests
         for i in range(num_parallel_requests):
@@ -245,14 +245,10 @@ class TritonConnection():
         # would make the stream confusing to clients
         callback = await setup_triton_stream(client, model, inputs, outputs, request_id)
 
-        # Get the complete response content from the stream
-        complete_response = await collect_stream_response(callback, client,
-                                                          timeout=120,
-                                                          stop_dict=body.stop)
-
         return StreamingResponse(
             stream_generator(
-                complete_response,
+                callback,
+                client,
                 body.model,
                 infer.text_input,
                 tools=body.tools if hasattr(body, 'tools') else None,
@@ -260,6 +256,8 @@ class TritonConnection():
                     body, 'parallel_tool_calls') else True,
                 response_format=body.response_format.type if hasattr(
                     body, 'response_format') and hasattr(body.response_format, 'type') else 'text',
+                timeout=120,
+                stop_dict=body.stop
             ),
             media_type="text/event-stream"
         )

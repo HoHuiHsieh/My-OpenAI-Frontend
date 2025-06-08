@@ -57,7 +57,8 @@ async def prepare_chat_completion_response(
         })
 
         # Process the individual response to get the choice
-        choice = await process_triton_response(synthetic_response, body.response_format.type, body.parallel_tool_calls)
+        response_type = body.response_format.type if hasattr(body, 'response_format') and hasattr(body.response_format, 'type') else None
+        choice = await process_triton_response(synthetic_response, response_type, body.parallel_tool_calls)
         choice.index = i  # Set the index for the choice
         all_choices.append(choice)
 
@@ -95,7 +96,7 @@ async def prepare_chat_completion_response(
 
 async def process_triton_response(
         response: grpcclient.InferResult,
-        response_format: Optional[str] = None,
+        response_format: Optional[str] = "text",
         parallel_tool_calls: Optional[bool] = True,
 ) -> ChatCompletionChoice:
     """

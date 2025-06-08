@@ -23,11 +23,14 @@ config = get_config(force_reload=False)
 app = FastAPI(
     title="Embeddings API",
     description="FastAPI application for embeddings endpoints",
-    version="1.0.0"
+    version="1.0.0",
+    # Disable automatic redirection for trailing slashes
+    redirect_slashes=False
 )
 
 
 @app.post("/", response_model=CreateEmbeddingResponse, summary="Creates a model response for the given queries or passages.")
+@app.post("", response_model=CreateEmbeddingResponse, summary="Creates a model response for the given queries or passages.")
 async def embeddings(
     request: Request,
     body: CreateEmbeddingRequest,
@@ -230,7 +233,7 @@ async def embeddings(
 
         # Log usage information for the current user
         UsageLogger.log_embeddings_usage(
-            user_id=current_user.username,
+            user_id=current_user.id,
             model=model_name,
             prompt_tokens=input_token_count,
             total_tokens=total_tokens,

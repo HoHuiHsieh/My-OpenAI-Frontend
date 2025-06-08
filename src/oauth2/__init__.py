@@ -105,7 +105,7 @@ from .db.operations import (
     get_all_users,
     get_user_tokens,
     create_token_for_user,
-    revoke_user_token,
+    delete_user_token,
     check_token_revoked
 )
 
@@ -137,7 +137,7 @@ __all__ = [
     "get_user_by_username", "get_user_by_email",
     "create_user", "update_user", "delete_user",
     "get_all_users", "get_user_tokens",
-    "create_token_for_user", "revoke_user_token", "check_token_revoked",
+    "create_token_for_user", "delete_user_token", "check_token_revoked",
     
     # User dependencies
     "get_current_user", "get_current_active_user",

@@ -200,7 +200,7 @@ def format_messages_for_llama3(
             parallel_tool_calls_string = "\n\nYou can call multiple tools in parallel. "
         else:
             parallel_tool_calls_string = "\n\nYou can call one tool at a time. "
-        tool_instructions = f"\n\nYou have access to the following tools:\n\n{tool_string}\n\nTo use a tool, respond with a message containing JSON that includes \"name\" (the function name) and \"arguments\" (the function arguments).\n{parallel_tool_calls_string}" if tool_string else ""
+        tool_instructions = f"\n\nYou have access to the following tools:\n\n{tool_string}\n\nTo use a tool, respond with a message containing JSON at the top of the message that includes \"name\" (the function name) and \"arguments\" (the function arguments).\n{parallel_tool_calls_string}" if tool_string else ""
 
 
     if response_format:

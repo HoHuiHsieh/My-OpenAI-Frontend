@@ -111,13 +111,16 @@ def get_config(force_reload: bool = False) -> Dict[str, Any]:
         ports = []
 
         for model_name, model_config in models_config.items():
-            if all(key in model_config for key in ["host", "port"]):
+            if isinstance(model_config, dict) and all(key in model_config for key in ["host", "port"]):
                 hosts.append(model_config["host"])
                 ports.append(model_config["port"])
 
-        # Add hosts and ports lists to the models section for backwards compatibility
-        config["models"]["host"] = hosts
-        config["models"]["port"] = ports
+        # Store hosts and ports lists in a separate section for backwards compatibility
+        # instead of adding them directly to the models dictionary
+        config["_backwards_compatibility"] = {
+            "hosts": hosts,
+            "ports": ports
+        }
 
         # Cache the validated config
         global _config_cache

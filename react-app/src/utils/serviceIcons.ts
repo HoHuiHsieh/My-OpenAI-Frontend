@@ -14,6 +14,8 @@ const serviceIcons: Record<string, string> = {
   default: '/images/icons/default-service.png',
 };
 
+const IMAGE_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
 /**
  * Get service icon URL with fallback
  * 
@@ -29,11 +31,11 @@ export const getServiceIcon = (serviceId: string, externalUrl?: string): string 
 
   // If we have a local icon for this service, use it
   if (serviceId && serviceIcons[serviceId]) {
-    return serviceIcons[serviceId];
+    return `${IMAGE_BASE_URL}${serviceIcons[serviceId]}`;
   }
 
   // Return default icon as fallback
-  return serviceIcons.default;
+  return `${IMAGE_BASE_URL}${serviceIcons.default}`;
 };
 
 export default serviceIcons;

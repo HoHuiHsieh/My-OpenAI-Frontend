@@ -8,13 +8,16 @@ interface MyDocumentProps extends DocumentProps {
   emotionStyleTags: React.JSX.Element[];
 }
 
+const PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
+
 export default function MyDocument({ emotionStyleTags }: MyDocumentProps) {
   return (
     <Html lang="en">
       <Head>
         {/* PWA primary color */}
         <meta name="theme-color" content="#0070f3" />
-        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="shortcut icon" href={`${PUBLIC_BASE_URL}/favicon.ico`} />
         <meta name="emotion-insertion-point" content="" />
         {emotionStyleTags}
       </Head>

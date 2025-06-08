@@ -6,6 +6,7 @@ This module provides database operations for user and token management.
 
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import and_
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 
@@ -287,7 +288,7 @@ def create_token_for_user(
     scopes: List[str],
     expires_at: Optional[datetime] = None,
     metadata: Optional[Dict[str, Any]] = None,
-    revoke_old_access_tokens: bool = True
+    delete_old_access_tokens: bool = True
 ) -> Optional[Token]:
     """
     Create a token record for a user.
@@ -300,7 +301,7 @@ def create_token_for_user(
         scopes: List of scopes for the token
         expires_at: Expiration time for the token
         metadata: Additional metadata for the token
-        revoke_old_access_tokens: Whether to revoke existing access tokens for the user
+        delete_old_access_tokens: Whether to delete existing access tokens for the user
         
     Returns:
         Optional[Token]: Created token or None if creation failed
@@ -312,31 +313,31 @@ def create_token_for_user(
             logger.warning(f"Token creation failed: User {username} not found")
             return None
         
-        # If creating an access token and revoke_old_access_tokens is True, 
-        # revoke all existing access tokens for this user
-        if token_type == "access" and revoke_old_access_tokens:
+        # If creating an access token and delete_old_access_tokens is True, 
+        # delete all existing access tokens for this user
+        if token_type == "access" and delete_old_access_tokens:
             try:
                 # Get all active access tokens for this user
-                from sqlalchemy import and_
                 existing_tokens = db.query(Token).filter(
                     and_(
                         Token.user_id == user.id,
-                        Token.token_type == "access",
-                        Token.revoked == False
+                        Token.token_type == "access"
                     )
                 ).all()
                 
-                # Revoke all existing tokens
+                # Delete all existing tokens
+                count = 0
                 for old_token in existing_tokens:
-                    old_token.revoked = True
-                    logger.debug(f"Revoking old access token (ID: {old_token.id}) for user {username}")
+                    db.delete(old_token)
+                    count += 1
+                    logger.debug(f"Deleting old access token (ID: {old_token.id}) for user {username}")
                 
-                if existing_tokens:
-                    logger.info(f"Revoked {len(existing_tokens)} existing access tokens for user {username}")
+                if count > 0:
+                    logger.info(f"Deleted {count} existing access tokens for user {username}")
                     
             except SQLAlchemyError as e:
-                logger.warning(f"Error revoking old access tokens for user {username}: {str(e)}")
-                # Continue creating the new token even if revocation fails
+                logger.warning(f"Error deleting old access tokens for user {username}: {str(e)}")
+                # Continue creating the new token even if deletion fails
             
         # Create token        
         token = Token(
@@ -361,23 +362,23 @@ def create_token_for_user(
         return None
 
 
-def revoke_user_token(db: Session, username: str, token_id: int) -> bool:
+def delete_user_token(db: Session, username: str, token_id: int) -> bool:
     """
-    Revoke a user's token.
+    Delete a user's token.
     
     Args:
         db: Database session
         username: Username of the token owner
-        token_id: ID of the token to revoke
+        token_id: ID of the token to delete
         
     Returns:
-        bool: True if revocation was successful, False otherwise
+        bool: True if deletion was successful, False otherwise
     """
     try:
         # Get user
         user = get_user_by_username(db, username)
         if not user:
-            logger.warning(f"Token revocation failed: User {username} not found")
+            logger.warning(f"Token deletion failed: User {username} not found")
             return False
             
         # Find token
@@ -386,21 +387,21 @@ def revoke_user_token(db: Session, username: str, token_id: int) -> bool:
         ).first()
         
         if not token:
-            logger.warning(f"Token revocation failed: Token {token_id} not found for user {username}")
+            logger.warning(f"Token deletion failed: Token {token_id} not found for user {username}")
             return False
             
-        # Revoke token
-        token.revoked = True
+        # Delete token
+        db.delete(token)
         db.commit()
         
-        logger.info(f"Revoked token {token_id} for user {username}")
+        logger.info(f"Deleted token {token_id} for user {username}")
         return True
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Error revoking token {token_id} for user {username}: {str(e)}")
+        logger.error(f"Error deleting token {token_id} for user {username}: {str(e)}")
         return False
-        
-        
+
+
 def check_token_revoked(db: Session, token_value: str) -> bool:
     """
     Check if a token has been revoked in the database.

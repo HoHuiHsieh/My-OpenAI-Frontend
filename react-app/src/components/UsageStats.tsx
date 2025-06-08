@@ -104,7 +104,7 @@ const UsageStats: React.FC<UsageStatsProps> = ({ useAdminPanel, username, classN
         if (isAuthenticated && user) {
             fetchUsageData();
         }
-    }, [isAuthenticated, user, period, numPeriods, selectedModel]);
+    }, [isAuthenticated, user, period, numPeriods, selectedModel, username]);
 
     // Effect to update chart when data changes
     useEffect(() => {

@@ -7,7 +7,7 @@ import time
 import uuid
 from typing import List, Any, AsyncGenerator, Optional
 from logger import get_logger
-
+import tritonclient.grpc as grpcclient
 from ..typedef import (
     ChatMessage,
     ChatCompletionChunkChoice,
@@ -17,18 +17,31 @@ from ..typedef import (
 )
 from .tool_calls import extract_tool_calls_from_text
 from .token_counter import get_default_model, create_usage_info
+from .inference import StreamingResponseCallback
 
 # Set up logger for this module
 logger = get_logger(__name__)
 
 
+def is_incomplete_unicode(byte_string, encoding='utf-8'):
+    try:
+        # print(byte_string, byte_string.decode(encoding))
+        byte_string.decode(encoding)
+        return False  # Decoding successful, not incomplete
+    except UnicodeDecodeError:
+        return True   # Decoding failed, likely incomplete
+
+
 async def stream_generator(
-        content: Any,
+        stream_callback: StreamingResponseCallback,
+        triton_client: grpcclient.InferenceServerClient,
         model: str,
         text_input: str,
         tools: Optional[List[ToolCall]] = None,
         parallel_tool_calls: Optional[bool] = True,
         response_format: Optional[str] = 'text',
+        timeout=60,
+        stop_dict=[]
 ) -> AsyncGenerator[str, None]:
     """
     Generator for streaming chat completions.
@@ -39,63 +52,108 @@ async def stream_generator(
     Yields:
         Chunks of the response in SSE format
     """
+    if not isinstance(stop_dict, list):
+        stop_dict = []
+
+    accumulated_content = ""
+    completion_id = f"chatcmpl-{uuid.uuid4().hex}"
+    created = int(time.time())
+
     # Stream header with model information
-    header = CreateChatCompletionChunkResponse(
-        id=f"chatcmpl-{uuid.uuid4().hex}",
-        created=int(time.time()),
-        model=model,
-        choices=[],
-    )
+    # Check if JSON format is required and ensure the response starts with '{'
+    if (response_format == 'json_object'):
+        accumulated_content = "{"
+        header = CreateChatCompletionChunkResponse(
+            id=completion_id,
+            created=created,
+            model=model,
+            choices=[
+                ChatCompletionChunkChoice(
+                    index=0,
+                    delta=ChatMessage(
+                        role="assistant",
+                        content=accumulated_content
+                    ),
+                    finish_reason=""
+                )
+            ],
+        )
+        logger.debug("Adjusted response for JSON format compatibility")
+
+    else:
+        header = CreateChatCompletionChunkResponse(
+            id=completion_id,
+            created=created,
+            model=model,
+            choices=[],
+        )
+
+    # Send the initial header chunk
     yield f"data: {json.dumps(header.model_dump())}\n\n"
 
-    # Generate the content in small chunks
-    words = content.split()
-
     # Keep track of accumulated content
-    accumulated_content = ""
+    start_time = time.time()
+    response_queue = await stream_callback.get_queue()
+    incomplete_char_buffer = ""  # Buffer to store incomplete UTF-8 characters
+    
+    while time.time() - start_time < timeout:
+        try:
+            # Wait for the next chunk from the response queue
+            current_word: str = await asyncio.wait_for(response_queue.get(), 1.0)
 
-    for i, word in enumerate(words):
-        # Add to accumulated content
-        current_word = word + (" " if i < len(words) - 1 else "")
-        accumulated_content += current_word
+            # Check if the current word is None or in the stop dictionary
+            if current_word is None or current_word.strip() in stop_dict:
+                break
+            
+            # Check for incomplete UTF-8 characters
+            if incomplete_char_buffer:
+                current_word = incomplete_char_buffer + current_word
+                incomplete_char_buffer = ""
+            
+            # Check if current_word might end with an incomplete UTF-8 character
+            if is_incomplete_unicode(current_word.encode('utf-8')):
+                logger.warning(f"Found incomplete UTF-8 character, buffering: {repr(current_word)}")
+                incomplete_char_buffer = current_word
+                response_queue.task_done()
+                continue
 
-        # Create a Delta ChatMessage for each chunk
-        delta = ChatMessage(
-            role="assistant",
-            content=current_word
-        )
+            # Continue with the rest of the stream processing
+            #  Accumulate the current word into the accumulated content
+            accumulated_content += current_word
 
-        # Create a ChatCompletionChunkChoice
-        choice = ChatCompletionChunkChoice(
-            index=0,
-            delta=delta,
-            finish_reason="" if i < len(words) - 1 else ""
-        )
+            # Create a Delta ChatMessage for each chunk
+            delta = ChatMessage(
+                role="assistant",
+                content=current_word
+            )
 
-        # Create the chunk response without usage info for intermediate chunks
-        chunk_data = CreateChatCompletionChunkResponse(
-            id=header.id,
-            created=header.created,
-            model=header.model,
-            choices=[choice],
-        )
+            # Create a ChatCompletionChunkChoice
+            choice = ChatCompletionChunkChoice(
+                index=0,
+                delta=delta,
+                finish_reason=""
+            )
 
-        yield f"data: {json.dumps(chunk_data.model_dump())}\n\n"
-        await asyncio.sleep(0.005)  # Small delay between chunks
+            # Create the chunk response without usage info for intermediate chunks
+            chunk_data = CreateChatCompletionChunkResponse(
+                id=header.id,
+                created=header.created,
+                model=header.model,
+                choices=[choice],
+            )
+
+            yield f"data: {json.dumps(chunk_data.model_dump())}\n\n"
+
+        except asyncio.TimeoutError:
+            if stream_callback.is_completed():
+                response_queue.task_done()
+                break
+            if time.time() - start_time > timeout / 2:
+                logger.warning(
+                    f"Still waiting for response after {time.time() - start_time:.1f}s")
 
     # Finalize the last chunk with accumulated content
     accumulated_content = accumulated_content.strip()
-
-    # Check if JSON format is required and ensure the response starts with '{'
-    if (response_format == 'json_object'):
-        # Ensure response starts with '{' for JSON format
-        if not accumulated_content.startswith('{'):
-            accumulated_content = '{' + accumulated_content
-        # If the response doesn't end with '}', add it
-        if not accumulated_content.endswith('}'):
-            accumulated_content = accumulated_content + '}'
-
-        logger.debug("Adjusted response for JSON format compatibility")
 
     # Truncate long responses for logging
     log_text = accumulated_content[:100] + \
@@ -119,11 +177,8 @@ async def stream_generator(
     # Create the final ChatCompletionChunkChoice
     final_delta = ChatMessage(
         role="assistant",
-        content=cleaned_text if len(tool_calls) == 0 else "",
+        content="",
         tool_calls=tool_calls
-    ) if len(tool_calls) > 0 else ChatMessage(
-        role="assistant",
-        content=cleaned_text
     )
 
     # Create the final choice with finish reason

@@ -74,9 +74,6 @@ class StreamingResponseCallback:
                 self.response_queue.put_nowait(None)
                 return
 
-            # prompt_tokens_tensor = result.as_numpy("prompt_tokens")
-            # print(prompt_tokens_tensor[0])
-
             # Process the output tensor data
             response_text = str(output_tensor[0].decode(
                 "utf-8", errors="replace"))

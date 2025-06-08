@@ -18,6 +18,13 @@ import Head from 'next/head';
 import { getServiceIcon } from '@/utils/serviceIcons';
 import TokenModal from '@/components/TokenModel';
 
+const IMAGE_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
+
+/**
+ * Main Home component for the AI Platform Portal.
+ * @returns 
+ */
 export default function Home() {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -71,7 +78,7 @@ export default function Home() {
     <>
       <Head>
         <title>AI Platform Portal</title>
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href={`${IMAGE_BASE_URL}/favicon.ico`} />
       </Head>
 
       {/* Header component */}

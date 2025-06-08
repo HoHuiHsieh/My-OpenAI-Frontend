@@ -38,6 +38,13 @@ interface TabPanelProps {
   value: number;
 }
 
+const IMAGE_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
+/**
+ * TabPanel component to render content for each tab in the admin panel.
+ * @param props 
+ * @returns 
+ */
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
 
@@ -205,7 +212,7 @@ export default function AdminPanel() {
     <>
       <Head>
         <title>Admin Panel - AI Platform</title>
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href={`${IMAGE_BASE_URL}/favicon.ico`} />
       </Head>
 
       <Header

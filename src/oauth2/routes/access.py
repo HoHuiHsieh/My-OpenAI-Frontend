@@ -108,7 +108,7 @@ async def refresh_access_token(
         scopes=scopes,
         expires_at=expires_at,
         metadata={"created_from": "refresh"},  # This is passed as metadata param but stored as token_metadata
-        revoke_old_access_tokens=True  # Revoke existing access tokens for security
+        delete_old_access_tokens=True  # Revoke existing access tokens for security
     )
     
     logger.info(f"Access token refreshed for user: {username}")

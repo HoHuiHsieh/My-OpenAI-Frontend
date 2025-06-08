@@ -9,9 +9,9 @@ from fastapi import Depends, HTTPException, status
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from typing import Optional
-
 from logger import get_logger
 from config import get_config
+from .db.operations import get_user_by_username
 
 # Initialize logger
 logger = get_logger(__name__)
@@ -68,9 +68,6 @@ def authenticate_user(db: Session, username: str, password: str) -> Optional[obj
         Optional[User]: The authenticated user object or None if authentication fails
     """
     try:
-        # Import here to avoid circular imports
-        from .db.operations import get_user_by_username
-        
         # Get user from database
         user = get_user_by_username(db, username)
         

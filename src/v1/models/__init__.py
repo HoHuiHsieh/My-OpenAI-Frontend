@@ -32,12 +32,17 @@ config = get_config(force_reload=False)
 # Define the FastAPI application
 app = FastAPI(
     title="Proxy API",
-    description="A FastAPI application that list and describe the various models available in the API. ."
+    description="A FastAPI application that list and describe the various models available in the API. .",
+    # Disable automatic redirection for trailing slashes
+    redirect_slashes=False
 )
 
 
 @app.get("/", response_model=CreateModelListResponse, summary="List available models")
-async def models_root(current_user: User = Security(get_current_active_user, scopes=[])):
+@app.get("", response_model=CreateModelListResponse, summary="List available models")
+async def models_root(
+    current_user: User = Depends(get_current_active_user),
+):
     """
     List all available models from configured model providers.
 
@@ -56,7 +61,8 @@ async def models_root(current_user: User = Security(get_current_active_user, sco
         HTTPException: If all target servers fail to respond or unauthorized access
     """
     # Extract the original request data and log the request
-    logger.info(f"Received request to list all models from user: {current_user.username}")
+    logger.info(
+        f"Received request to list all models from user: {current_user.username}")
 
     # Get the model server configurations from the config
     model_configs = config.get("models", {})
@@ -73,15 +79,15 @@ async def models_root(current_user: User = Security(get_current_active_user, sco
             logger.warning(
                 f"Model server {key} does not have a valid response configuration.")
             continue
-        
+
         try:
             # Extract the target model response data and convert to ModelInfo
             model_response = model.get("response")
-            
+
             # Set default timestamp if not provided or if it's zero
             if not model_response.get("created") or model_response.get("created") == 0:
                 model_response["created"] = int(time.time())
-                
+
             # Create a validated ModelInfo object
             model_info = ModelInfo(**model_response)
             data.append(model_info)

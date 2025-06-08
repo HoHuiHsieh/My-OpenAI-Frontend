@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  basePath: '/share',
   reactStrictMode: true,
   images: {
     unoptimized: true,

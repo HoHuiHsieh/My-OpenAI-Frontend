@@ -23,7 +23,7 @@ app = FastAPI(
 )
 
 
-@app.post("/completion", response_model=CreateChatCompletionResponse, summary="Creates a model response for the given chat conversation.")
+@app.post("/completions", response_model=CreateChatCompletionResponse, summary="Creates a model response for the given chat conversation.")
 async def chat_completion(
     request: Request,
     body: CreateChatCompletionRequest,
@@ -51,7 +51,7 @@ async def chat_completion(
                 detail="No model servers configured in the system."
             )
 
-        model_config = models_config.get(body.model)
+        model_config = models_config.get(body.model.split("/").at(-1))
         if not model_config:
             raise HTTPException(
                 status_code=HTTP_400_BAD_REQUEST,

@@ -22,7 +22,7 @@ from ..db.operations import create_user
 from ..db.operations import update_user
 from ..db.operations import delete_user
 from ..db.models import Token, User
-from ..db.operations import revoke_user_token
+from ..db.operations import delete_user_token
 from . import admin_router
 
 # Initialize logger
@@ -451,7 +451,7 @@ async def create_access_token_for_user(
         scopes=token_request.scopes,
         expires_at=expires_at,
         metadata={"created_by_admin": token_data.get("sub")},  # This is passed as metadata param but stored as token_metadata
-        revoke_old_access_tokens=True  # Explicitly revoke any existing access tokens for this user
+        delete_old_access_tokens=True  # Explicitly revoke any existing access tokens for this user
     )
     
     if db_token is None:
@@ -492,7 +492,6 @@ async def revoke_access_token(
     Raises:
         HTTPException: If token revocation fails
     """
-    print(f"Revoke access token for user: {username}, token_id: {token_id}")
     # Check if user exists
     user = get_user_by_username(db, username)
     if user is None:
@@ -504,7 +503,7 @@ async def revoke_access_token(
         )
     
     # Revoke token
-    success = revoke_user_token(db=db, username=username, token_id=token_id)
+    success = delete_user_token(db=db, username=username, token_id=token_id)
     if not success:
         admin_username = token_data.get("sub")
         logger.error(f"Admin {admin_username} failed to revoke token {token_id} for user: {username}")
