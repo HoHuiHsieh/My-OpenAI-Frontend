@@ -11,10 +11,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response, JSONResponse
 import jwt
 from typing import List, Optional, Callable, Union
-
 from logger import get_logger
 from config import get_config
-from .token_manager import verify_token, token_type_session
+from .token_manager import verify_token, token_type_session, token_type_access
+from oauth2.db import get_db
+from oauth2.db.operations import check_token_revoked
 
 # Initialize logger
 logger = get_logger(__name__)
@@ -66,11 +67,6 @@ class OAuth2Middleware(BaseHTTPMiddleware):
         Returns:
             Response: The HTTP response
         """
-        # Skip authentication if disabled
-        if not self.enable_auth:
-            logger.debug("Authentication disabled, skipping token validation")
-            return await call_next(request)
-        
         # Skip authentication for excluded paths
         path = request.url.path
         for excluded_path in self.exclude_paths:
@@ -114,9 +110,25 @@ class OAuth2Middleware(BaseHTTPMiddleware):
         # Validate token
         try:
             payload = verify_token(token)
-            # Add the token payload to the request state for use in endpoints
+            token_type = payload.get('type')
+            
+            if token_type == token_type_access:
+                # For access tokens, verify in database that it exists and is not revoked
+                db = next(get_db())
+                try:
+                    if check_token_revoked(db, token):
+                        logger.warning(f"Access token is revoked for path: {path}")
+                        return JSONResponse(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            content={"detail": "Token has been revoked"},
+                            headers={"WWW-Authenticate": "Bearer"},
+                        )
+                finally:
+                    db.close()
+            
+            # For all token types, add payload to request state
             request.state.user = payload
-            logger.debug(f"Authenticated user: {payload.get('sub')}")
+            logger.debug(f"Authenticated user: {payload.get('sub')} with {token_type} token")
         except jwt.ExpiredSignatureError:
             logger.warning(f"Token expired for path: {path}")
             return JSONResponse(

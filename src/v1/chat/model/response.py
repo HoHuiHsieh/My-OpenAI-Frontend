@@ -12,6 +12,7 @@ import tritonclient.grpc as grpcclient
 
 from logger import get_logger, UsageLogger
 from ..typedef import (
+    UsageInfo,
     ChatMessage,
     ChatCompletionChoice,
     CreateChatCompletionResponse,
@@ -28,6 +29,8 @@ async def prepare_chat_completion_response(
     responses: List[grpcclient.InferResult],
     body: CreateChatCompletionRequest,
     text_input: str,
+    ignore_usage: bool = False,
+    request_id: str = None
 ) -> CreateChatCompletionResponse:
     """
     Prepare a ChatCompletionResponse from Triton Inference Server response.
@@ -38,12 +41,14 @@ async def prepare_chat_completion_response(
         request_data: Original request data for token counting (if available)
         current_user: The current user making the request
         request: The original FastAPI request object
+        request_id: Optional request ID to use for the completion ID
 
     Returns:
         A formatted ChatCompletionResponse
     """
     # Process all successful responses into a single response with multiple choices
-    completion_id = f"chatcmpl-{uuid.uuid4().hex}"
+    # Use the provided request_id if available, otherwise generate a new one
+    completion_id = f"chatcmpl-{request_id or uuid.uuid4().hex}"
     created_time = int(time.time())
 
     all_choices: List[ChatCompletionChoice] = []
@@ -51,13 +56,16 @@ async def prepare_chat_completion_response(
 
     # Process each response text
     for i, response_text in enumerate(responses):
+        # Create a synthetic response object with a check for None
         synthetic_response = type('obj', (object,), {
             'as_numpy': lambda name: np.array([response_text.encode('utf-8')])
-            if name == 'output' else None
+            if name == 'output' and response_text is not None
+            else np.array([b"Error: No response generated"])
         })
 
         # Process the individual response to get the choice
-        response_type = body.response_format.type if hasattr(body, 'response_format') and hasattr(body.response_format, 'type') else None
+        response_type = body.response_format.type if hasattr(
+            body, 'response_format') and hasattr(body.response_format, 'type') else None
         choice = await process_triton_response(synthetic_response, response_type, body.parallel_tool_calls)
         choice.index = i  # Set the index for the choice
         all_choices.append(choice)
@@ -73,16 +81,23 @@ async def prepare_chat_completion_response(
             completions.append(choice.message.content)
         elif choice.message and isinstance(choice.message.content, list):
             # If content is a list, join it into a single string
-            completions.append(' '.join(choice.message.content))            
+            completions.append(' '.join(choice.message.content))
 
     # Create an accurate usage info with token counting - use completion_id as request_id for independent tracking
-    usage = await create_usage_info(
-        model=body.model,
-        input_text=text_input,
-        completion=completions,
-        tool_calls=tool_calls_list if len(tool_calls_list) > 0 else None,
-        request_id=completion_id
-    )
+    if not ignore_usage:
+        usage = await create_usage_info(
+            model=body.model,
+            input_text=text_input,
+            completion=completions,
+            tool_calls=tool_calls_list if len(tool_calls_list) > 0 else None,
+            request_id=completion_id
+        )
+    else:
+        usage = UsageInfo(
+            prompt_tokens=0,
+            completion_tokens=0,
+            total_tokens=0
+        )
 
     # Create the final response
     return CreateChatCompletionResponse(

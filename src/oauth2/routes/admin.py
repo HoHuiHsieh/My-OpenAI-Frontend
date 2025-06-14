@@ -492,6 +492,7 @@ async def revoke_access_token(
     Raises:
         HTTPException: If token revocation fails
     """
+    print(f"Revoke access token for user: {username}, token_id: {token_id}")
     # Check if user exists
     user = get_user_by_username(db, username)
     if user is None:

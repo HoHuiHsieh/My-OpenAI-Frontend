@@ -35,7 +35,6 @@ def extract_tool_calls_from_text(text: str, parallel_tool_calls: Optional[bool] 
 
             logger.debug(
                 f"Found {len(potential_objects)} potential JSON objects in stream")
-            content_without_tools = text
 
             for obj_str in potential_objects:
                 try:
@@ -60,7 +59,8 @@ def extract_tool_calls_from_text(text: str, parallel_tool_calls: Optional[bool] 
                             # Create a proper ToolCallFunction
                             tool_function = ToolCallFunction(
                                 name=function_data['name'],
-                                arguments=json.dumps(arguments, ensure_ascii=False) if isinstance(arguments, dict) else arguments
+                                arguments=json.dumps(arguments, ensure_ascii=False) if isinstance(
+                                    arguments, dict) else arguments
                             )
 
                             # Create the ToolCall
@@ -78,8 +78,7 @@ def extract_tool_calls_from_text(text: str, parallel_tool_calls: Optional[bool] 
                                     "Skipping additional tool call because parallel_tool_calls is False")
 
                             # Remove the tool call from the content
-                            content_without_tools = content_without_tools.replace(
-                                obj_str, "").strip()
+                            # cleaned_text = cleaned_text.replace(obj_str, "")
 
                 except json.JSONDecodeError:
                     # Not a valid JSON object, skip it
@@ -89,8 +88,6 @@ def extract_tool_calls_from_text(text: str, parallel_tool_calls: Optional[bool] 
                         f"Error processing potential tool call in stream: {str(e)}")
                     continue
 
-            if found_tool_calls:
-                cleaned_text = content_without_tools
     except Exception as e:
         logger.warning(f"Error extracting tool calls from stream: {str(e)}")
 

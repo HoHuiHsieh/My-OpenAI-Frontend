@@ -7,14 +7,15 @@ including scope verification and permission management.
 
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import SecurityScopes
-from typing import List, Dict, Optional, Set
-from sqlalchemy.orm import Session
-
+from typing import List, Dict
+from sqlalchemy.exc import SQLAlchemyError
 from logger import get_logger
 from config import get_config
 from . import oauth2_scheme
-from .db.models import User
 from .token_manager import decode_token
+from .db import get_db
+from .db.operations import check_token_revoked
+from .db.models import Token
 
 # Initialize logger
 logger = get_logger(__name__)
@@ -92,6 +93,41 @@ def verify_scopes(security_scopes: SecurityScopes, token: str = Depends(oauth2_s
     try:
         # Decode token without verifying scopes yet
         payload = decode_token(token)
+        
+        # Check if this is an access token for v1 APIs
+        token_type = payload.get("type")
+
+        if token_type == "access":
+            # For access tokens, verify in database that it exists and is not revoked
+            db = next(get_db())
+            try:
+                # First check if token exists in database
+                token_record = db.query(Token).filter(Token.token == token).first()
+                if not token_record:
+                    logger.warning(f"Access token not found in database for user {payload.get('sub')}")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Token not found in database",
+                        headers={"WWW-Authenticate": authenticate_value},
+                    )
+                
+                # Then check if token is revoked
+                if token_record.revoked:
+                    logger.warning(f"Access token is revoked for user {payload.get('sub')}")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Token has been revoked",
+                        headers={"WWW-Authenticate": authenticate_value},
+                    )
+            except SQLAlchemyError as e:
+                logger.error(f"Database error checking token: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Error validating token",
+                    headers={"WWW-Authenticate": authenticate_value},
+                )
+            finally:
+                db.close()
         
         # Extract token scopes
         token_scopes = payload.get("scopes", [])

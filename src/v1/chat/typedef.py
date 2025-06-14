@@ -134,12 +134,11 @@ class ChatMessage(BaseModel):
     role: str = Field(
         description="The role of the message author. One of 'developer', 'system', 'user', 'assistant', or 'tool'."
     )
-    content: Union[
+    content: Optional[Union[
         str,
         List[str],
-        List[TextContentPart],
-        List[FileContentPart],
-    ] = Field(
+        List[TextContentPart | FileContentPart],
+    ]] = Field(
         description="The content of the message."
     )
     name: Optional[str] = Field(
@@ -237,7 +236,7 @@ class FunctionDefinition(BaseModel):
         default=None,
         description="A description of what the function does, used by the model to choose when and how to call the function."
     )
-    parameters: Optional[ParametersDefinition] = Field(
+    parameters: Optional[ParametersDefinition | Any] = Field(
         default_factory=dict,
         description="The parameters the function accepts, described as a JSON Schema object."
     )
@@ -279,7 +278,7 @@ class CreateChatCompletionRequest(BaseModel):
         description="A list of messages comprising the conversation so far."
     )
     max_completion_tokens: Optional[PositiveInt] = Field(
-        default=None,
+        default=1024,
         description="An upper bound for the number of tokens that can be generated for a completion, including visible output tokens and reasoning tokens."
     )
     temperature: Optional[float] = Field(
@@ -317,6 +316,10 @@ class CreateChatCompletionRequest(BaseModel):
     stream: Optional[bool] = Field(
         default=False,
         description="If set to true, the model response data will be streamed to the client as it is generated using server-sent events."
+    )
+    stream_options: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Optional parameters for streaming responses, such as chunk size or event format."
     )
     parallel_tool_calls: Optional[bool] = Field(
         default=False,

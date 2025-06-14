@@ -200,7 +200,7 @@ def format_messages_for_llama3(
             parallel_tool_calls_string = "\n\nYou can call multiple tools in parallel. "
         else:
             parallel_tool_calls_string = "\n\nYou can call one tool at a time. "
-        tool_instructions = f"\n\nYou have access to the following tools:\n\n{tool_string}\n\nTo use a tool, respond with a message containing JSON at the top of the message that includes \"name\" (the function name) and \"arguments\" (the function arguments).\n{parallel_tool_calls_string}" if tool_string else ""
+        tool_instructions = f"\n\nYou have access to the following tools:\n\n{tool_string}\n\nTo use a tool, respond with a message containing a valid JSON object with these required attributes:\n- \"name\": the exact function name to call\n- \"arguments\": an object containing all required parameters for the function\n\nExample format:\n```json\n{{\n  \"name\": \"tool_name\",\n  \"arguments\": {{\n    \"param1\": \"value1\",\n    \"param2\": \"value2\"\n  }}\n}}\n```\n{parallel_tool_calls_string}" if tool_string else ""
 
 
     if response_format:
@@ -235,9 +235,10 @@ def format_messages_for_llama3(
 
         formatted_text += f"{START_HEADER}{message.role}{END_HEADER}\n"
 
-        if not message.content:
-            formatted_text += f"{END_OF_TURN}\n"
-            continue
+        # if not message.content:
+        #     formatted_text += f"{END_OF_TURN}\n"
+        #     continue
+        logger.debug( f"{message}")
 
         if isinstance(message.content, str):
             content = message.content.strip()

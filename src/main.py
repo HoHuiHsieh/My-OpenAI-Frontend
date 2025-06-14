@@ -28,12 +28,7 @@ logger.info("Starting My OpenAI Frontend API application")
 config = get_config()
 oauth2_config = config.get("oauth2", {})
 enable_auth = oauth2_config.get("enable_authentication", True)
-# Default exclude paths include static content in /share and documentation
-default_exclude = [
-    "/docs", "/redoc", "/openapi.json", 
-    "/share/"
-]
-exclude_paths = oauth2_config.get("exclude_paths", default_exclude)
+exclude_paths = oauth2_config.get("exclude_paths", [])
 
 # Define the lifespan context manager
 

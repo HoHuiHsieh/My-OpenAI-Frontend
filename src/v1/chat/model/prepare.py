@@ -115,3 +115,23 @@ def prepare_triton_inputs_with_seed(
             break
 
     return inputs
+
+
+def prepare_my_agent_inputs(
+        text_input: str = "",
+        api_key: str = "",
+):
+    """
+    Prepare Triton inputs for MyAgent with a specified random seed.
+
+    """
+    inputs: List[grpcclient.InferInput] = []
+    inputs.append(grpcclient.InferInput("text_input", [1], "BYTES"))
+    inputs.append(grpcclient.InferInput("OPENAI_API_KEY", [1], "BYTES"))
+
+    input_data = np.array([text_input], dtype=np.object_)
+    apikey_data = np.array([api_key], dtype=np.object_)
+    inputs[0].set_data_from_numpy(input_data)
+    inputs[1].set_data_from_numpy(apikey_data)
+
+    return inputs
