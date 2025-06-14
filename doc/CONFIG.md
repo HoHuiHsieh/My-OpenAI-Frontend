@@ -27,7 +27,7 @@ oauth2:
 # Database Configuration
 database:
   engine: "postgresql"
-  host: "172.16.120.101"
+  host: "localhost"
   port: 5432
   username: "postgres"
   password: "password"
