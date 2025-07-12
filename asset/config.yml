@@ -53,17 +53,8 @@ models:
       created: 0
       object: "model"
       owned_by: "organization-owner"
-  llama-3.2-11b-vision-instruct:
-    host: 192.168.1.202
-    port: 8001
-    type: ["chat", "vision"]
-    response:
-      id: "meta/llama-3.1-8b-instruct"
-      created: 0
-      object: "model"
-      owned_by: "organization-owner"
   nv-embed-v2:
-    host: 192.168.1.203
+    host: 192.168.1.202
     port: 8001
     type: ["embedding"]
     args:
@@ -71,6 +62,15 @@ models:
     response:
       id: "nvidia/nv-embed-v2"
       created: 0
+      object: "model"
+      owned_by: "organization-owner"
+  my-doc-agent:
+    host: 192.168.1.203
+    port: 8000
+    type: ["chat:agent:my-doc-agent"]
+    response:
+      id: "my-agent/my-doc-agent"
+      created: 1750907439
       object: "model"
       owned_by: "organization-owner"
 
