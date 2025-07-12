@@ -27,15 +27,15 @@ class User(Base):
     full_name = Column(String)
     hashed_password = Column(String, nullable=False)
     disabled = Column(Boolean, default=False)
-    role = Column(String, default="user")  # user, admin
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    scopes = Column(JSONB, nullable=False, default=list)
     
     # Relationship to tokens
     tokens = relationship("Token", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
-        return f"<User(username='{self.username}', email='{self.email}', role='{self.role}')>"
+        return f"<User(username='{self.username}', email='{self.email}')>"
 
 
 class Token(Base):

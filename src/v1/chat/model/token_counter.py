@@ -290,13 +290,13 @@ async def create_usage_info(
             tracker.add_completion_tokens(completion_tokens)
 
     # Include tool calls in completion token count if present
-    if tool_calls:
-        tool_call_text = await extract_tool_call_text(tool_calls)
-        if tool_call_text:
-            tool_call_tokens = await count_tokens(model, tool_call_text)
-            tracker.add_tool_call_tokens(tool_call_tokens)
-            logger.debug(
-                f"Added {tool_call_tokens} tokens for tool calls for request {request_id}")
+    # if tool_calls:
+    #     tool_call_text = await extract_tool_call_text(tool_calls)
+    #     if tool_call_text:
+    #         tool_call_tokens = await count_tokens(model, tool_call_text)
+    #         tracker.add_tool_call_tokens(tool_call_tokens)
+    #         logger.debug(
+    #             f"Added {tool_call_tokens} tokens for tool calls for request {request_id}")
 
     # Get and return the UsageInfo object for this specific request only
     return tracker.get_usage_info()

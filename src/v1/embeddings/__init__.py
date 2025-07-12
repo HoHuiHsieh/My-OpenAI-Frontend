@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import traceback
 import base64
 import numpy as np
 from typing import List
@@ -7,7 +8,7 @@ from tritonclient.utils import InferenceServerException
 from fastapi import FastAPI, HTTPException, Security, Depends, Request
 from .nv_embed_v2 import is_nv_embed_v2_model
 from .typedef import CreateEmbeddingRequest, CreateEmbeddingResponse
-from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR, HTTP_400_BAD_REQUEST
+from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR, HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 from oauth2 import get_current_active_user, User, SecurityScopes
 from config import get_config
 from logger import get_logger, UsageLogger
@@ -34,8 +35,7 @@ app = FastAPI(
 async def embeddings(
     request: Request,
     body: CreateEmbeddingRequest,
-    current_user: User = Security(
-        get_current_active_user, scopes=["embeddings:read"])
+    current_user: User = Security(get_current_active_user)
 ) -> CreateEmbeddingResponse:
     """
     Endpoint to create embeddings by forwarding requests to a Triton Inference Server.
@@ -72,6 +72,14 @@ async def embeddings(
                 status_code=HTTP_400_BAD_REQUEST,
                 detail=f"Model {body.model} is not configured in the system."
             )
+        
+        # Check if the user has permission to access this model
+        if "admin" not in current_user.scopes:
+            if not set(model_config.get('type', [])).intersection(current_user.scopes):
+                raise HTTPException(
+                    status_code=HTTP_403_FORBIDDEN,
+                    detail=f"User {current_user.username} does not have required scopes for model {body.model}."
+                )
 
         # Get server details
         host = model_config.get("host", "localhost")
@@ -247,14 +255,22 @@ async def embeddings(
             f"Successfully created embedding response for model {model_name}")
         return response_data
 
-    except HTTPException:
-        # Re-raise HTTP exceptions without modification
-        raise
-    except Exception as e:
-        # Catch all other unexpected errors
-        logger.error(
-            f"Unexpected error in embeddings endpoint: {str(e)}", exc_info=True)
+    except InferenceServerException as e:
+        logger.error(f"Inference server error: {str(e)}")
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while processing your request"
+            detail=f"Inference server error: {str(e)}"
+        )
+    
+    except HTTPException as e:
+        logger.error(f"HTTP error in chat completion: {str(e)}")
+        # Re-raise HTTPException to preserve status code and detail
+        raise e
+    
+    except Exception as e:
+        traceback.print_exc()
+        logger.error(f"Unexpected error in chat completion: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error: {str(e)}"
         )

@@ -15,10 +15,9 @@ import jwt
 from logger import get_logger
 from ..db import get_db
 from ..token_manager import create_access_token, decode_token
-from ..rbac import verify_scopes
+from ..scope_control import verify_scopes
 from ..db.operations import create_token_for_user, get_user_by_username
 from ..db.operations import check_token_revoked
-from ..scopes import user_scopes, admin_scopes
 from . import access_router
 
 # Initialize logger
@@ -66,17 +65,10 @@ async def refresh_access_token(
     """
     # Extract username and scopes from token
     username = token_data.get("sub")
-    role = token_data.get("role", "user")
-    is_admin = role == "admin"
+    scopes = token_data.get("scopes", [])
 
-    if role == "admin":
-        scopes = [s.value for s in admin_scopes ]
-    elif role == "user":
-        scopes = [s.value for s in user_scopes ]
-    else:
-        scopes = []
-    
-    print(f"Refreshing access token for user: {username} with scopes: {scopes} and role: {role}")
+    # Check is admin scope
+    is_admin = "admin" in scopes  # Check if user has admin scope
 
     # Create new access token
     token = create_access_token(

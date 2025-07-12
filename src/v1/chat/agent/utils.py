@@ -22,5 +22,5 @@ def is_home_made_agent_model(model_name: str) -> bool:
         True if the model is a home made AI agent  model, False otherwise
     """
     model_name_lower = model_name.lower()
-    identifiers = ["myagent", "my-agent"]
+    identifiers = ["my-agent-for-test", "my-doc-agent"]
     return any(identifier in model_name_lower for identifier in identifiers)

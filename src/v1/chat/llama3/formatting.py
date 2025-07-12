@@ -269,7 +269,7 @@ def format_messages_for_llama3(
 
         if format_type == "json_object":
             # Provide opening brace to prompt model to continue the JSON structure
-            formatted_text += "{"
+            formatted_text += '{\n"name":'
 
     # Logging for debugging purposes with truncated preview
     log_preview = formatted_text[:100] + \

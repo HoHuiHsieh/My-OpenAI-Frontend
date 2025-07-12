@@ -325,7 +325,6 @@ def get_usage(
         with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
             cursor.execute(query, params)
             results = cursor.fetchall()
-            print(results)
 
         # Format results
         formatted_results = []

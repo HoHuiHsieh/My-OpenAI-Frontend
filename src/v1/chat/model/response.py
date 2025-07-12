@@ -141,8 +141,8 @@ async def process_triton_response(
         # Check if JSON format is required and ensure the response starts with '{'
         if (response_format == 'json_object'):
             # Ensure response starts with '{' for JSON format
-            if not response_text.startswith('{'):
-                response_text = '{' + response_text
+            if not response_text.startswith('{"name":'):
+                response_text = '{\n"name":' + response_text
             # If the response doesn't end with '}', add it
             if not response_text.endswith('}'):
                 response_text = response_text + '}'
@@ -175,7 +175,7 @@ async def process_triton_response(
         )
 
         if has_tool_calls:
-            response_text = cleaned_text
+            # response_text = cleaned_text
             # Update finish_reason to tool_calls if we found tool calls
             finish_reason = "tool_calls"
             logger.info(

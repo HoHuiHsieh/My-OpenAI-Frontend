@@ -64,26 +64,29 @@ class StreamingResponseCallback:
         try:
             # Extract the output tensor data
             if result is None:
+                print("Received None result, signaling completion")
                 self.completed = True
                 # End of stream signal
                 self.response_queue.put_nowait("".join(self._received_chunks))
                 return
 
-            output_tensor = result.as_numpy("text_output")
-            if output_tensor is None or len(output_tensor) == 0 or output_tensor[0] == b'':
+            # Get the output tensor named "text_output"
+            output_tensor_text = result.as_numpy("text_output")
+            if output_tensor_text is None or len(output_tensor_text) == 0 or (len(self._received_chunks) > 0 and output_tensor_text[0] == b''):
                 # Close streaming on empty byte string
                 self.completed = True
                 self.response_queue.put_nowait(None)
                 return
+            
+            # - Decode the output tensor to a string
+            response_text = [txt.decode("utf-8", errors="replace") for txt in output_tensor_text if isinstance(txt, bytes)]
+            response_text = "".join(response_text)
 
-            # Process the output tensor data
-            response_text = str(output_tensor[0].decode("utf-8", errors="replace"))
-
-            # Add to our accumulated chunks if we're collecting a complete response
+            # - Add to our accumulated chunks if we're collecting a complete response
             if len(self._received_chunks) < self._max_queue_size:
                 self._received_chunks.append(response_text)
 
-            # Put the chunk in the queue for immediate processing
+            # - Put the chunk in the queue for immediate processing
             self.response_queue.put_nowait(response_text)
 
         except Exception as e:
@@ -175,7 +178,7 @@ class StreamProcessor:
         stream_callback: StreamingResponseCallback,
         triton_client: grpcclient.InferenceServerClient,
         tokenizor_client: grpcclient.InferenceServerClient,
-        timeout: int = 60,
+        timeout: int = 300,
         stop_dict: List[str] = None,
         max_tokens: Optional[int] = None,
         request_id: Optional[str] = None
@@ -203,6 +206,8 @@ class StreamProcessor:
         self.accumulated_content = ""
         
         # Ensure stop_dict is properly formatted
+        if isinstance(self.stop_dict, str):
+            self.stop_dict = [self.stop_dict]
         if not isinstance(self.stop_dict, list):
             self.stop_dict = []
     
@@ -269,14 +274,14 @@ class StreamProcessor:
         try:
             # Check accumulated_content include stop sequences
             if self.stop_dict and any(stop in self.accumulated_content for stop in self.stop_dict):
-                logger.warning(f"Detected stop sequence in accumulated content, stopping stream")
+                logger.debug(f"Detected stop sequence in accumulated content, stopped by {self.stop_dict}")
                 return None, True
             
             # Wait for the next chunk with a timeout
             current_word = await asyncio.wait_for(response_queue.get(), 1.0)
             
             # Check for stop conditions
-            if current_word is None or current_word.strip() in self.stop_dict:
+            if current_word is None:
                 return None, True
             
             # Add the current word to accumulated content

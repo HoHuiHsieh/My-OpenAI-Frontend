@@ -113,7 +113,7 @@ async def collect_stream_response(
     stream_callback: StreamingResponseCallback,
     triton_client: grpcclient.InferenceServerClient,
     tokenizor_client: grpcclient.InferenceServerClient,
-    timeout=60,
+    timeout=300,
     stop_dict=[],
     max_tokens: Optional[int] = None,
     request_id: Optional[str] = None

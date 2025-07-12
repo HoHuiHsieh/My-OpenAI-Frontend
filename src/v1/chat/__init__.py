@@ -2,11 +2,12 @@
 import traceback
 from fastapi import FastAPI, HTTPException, Security, Request
 from tritonclient.utils import InferenceServerException
-from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR, HTTP_400_BAD_REQUEST
+from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR, HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 from typing import Any
 from logger import get_logger
 from config import get_config
 from oauth2 import get_current_active_user, User
+from oauth2.scopes import chat_completion_scopes
 from .typedef import CreateChatCompletionResponse, CreateChatCompletionRequest
 from .model import TritonConnection
 
@@ -28,8 +29,7 @@ app = FastAPI(
 async def chat_completion(
     request: Request,
     body: CreateChatCompletionRequest,
-    current_user: User = Security(get_current_active_user, 
-                                  scopes=["chat:read"])
+    current_user: User = Security(get_current_active_user)
 ):
     """
     Endpoint to create a chat completion.
@@ -44,11 +44,11 @@ async def chat_completion(
     logger.info(
         f"Received request for chat completion with model: {body.model}")
     
-    logger.debug(f"Request body: {body}")
-    
     try:
+        # Extract the API key from the request headers
         api_key = request.headers.get("Authorization", "").split(" ")[-1] 
 
+        # Modify the model name to match the Triton server configuration
         models_config = config.get("models", {})
         if not models_config:
             raise HTTPException(
@@ -57,12 +57,21 @@ async def chat_completion(
             )
         body.model = body.model.split("/")[-1]
 
+        # Extract the model configuration from the loaded config
         model_config = models_config.get(body.model)
         if not model_config:
             raise HTTPException(
                 status_code=HTTP_400_BAD_REQUEST,
                 detail=f"Model {body.model} is not configured in the system."
             )
+        
+        # Check if the user has permission to access this model
+        if "admin" not in current_user.scopes:
+            if not set(model_config.get('type', [])).intersection(current_user.scopes):
+                raise HTTPException(
+                    status_code=HTTP_403_FORBIDDEN,
+                    detail=f"User {current_user.username} does not have required scopes for model {body.model}."
+                )
 
         # Extract host and port from model configuration
         host = model_config.get("host", "localhost")
@@ -100,6 +109,10 @@ async def chat_completion(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Inference server error: {str(e)}"
         )
+    except HTTPException as e:
+        logger.error(f"HTTP error in chat completion: {str(e)}")
+        # Re-raise HTTPException to preserve status code and detail
+        raise e
     except Exception as e:
         traceback.print_exc()
         logger.error(f"Unexpected error in chat completion: {str(e)}")

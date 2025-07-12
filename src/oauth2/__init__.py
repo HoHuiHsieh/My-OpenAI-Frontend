@@ -5,7 +5,7 @@ This module handles authentication and authorization using OAuth2 protocol
 for the My OpenAI Frontend service. It provides functionality for:
 - Token validation
 - User authentication
-- Role-based access control
+- Scope-based access control
 - Integration with various identity providers
 - PostgreSQL database integration for user management
 
@@ -26,7 +26,7 @@ Module Structure:
   - __init__.py:               Database package initialization
   - models.py:                 User and token data models
   - operations.py:             Database operations
-- rbac.py:                     Role-based access control
+- scope_control.py:            Scope-based access control
 - scopes.py:                   API scope definitions and management
 - middleware.py:               Authentication middleware
 - routes/
@@ -91,8 +91,21 @@ from .token_manager import (
 # Import auth and middleware
 from .auth import verify_password, get_password_hash, authenticate_user
 from .middleware import OAuth2Middleware
-from .rbac import RoleBasedAccessControl, verify_scopes
+
+# Import scopes
 from .scopes import Scopes, available_scopes
+
+# Import scope-based access control
+from .scope_control import (
+    ScopeBasedAccessControl,
+    scope_control,
+    verify_scopes,
+    require_scopes,
+    require_admin,
+    require_models_read,
+    require_chat_read,
+    require_embeddings_read
+)
 
 # Import database models and operations
 from .db.models import User, Token
@@ -122,11 +135,12 @@ __all__ = [
     # Middleware
     "OAuth2Middleware",
     
-    # Role-based access control
-    "RoleBasedAccessControl", "verify_scopes",
+    # Scope-based access control
+    "ScopeBasedAccessControl", "verify_scopes", "scope_control", "require_scopes",
+    "require_admin", "require_models_read", "require_chat_read", "require_embeddings_read",
     
     # Scopes
-    "Scopes", "available_scopes", "admin_scopes", "user_scopes",
+    "Scopes", "available_scopes",
     
     # Token management
     "create_session_token", "create_access_token", 

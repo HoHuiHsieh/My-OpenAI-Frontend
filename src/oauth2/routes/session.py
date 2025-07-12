@@ -16,9 +16,9 @@ from logger import get_logger
 from ..db import get_db
 from ..auth import authenticate_user, verify_password, get_password_hash
 from ..token_manager import create_session_token, verify_token
-from ..rbac import verify_scopes
+from ..scope_control import verify_scopes
 from ..db.operations import get_user_by_username
-from ..scopes import user_scopes, admin_scopes
+# from ..db.operations import get_default_user_scopes
 from . import session_router
 
 # Initialize logger
@@ -38,7 +38,6 @@ class UserInfo(BaseModel):
     email: str = None
     full_name: str = None
     disabled: bool = False
-    role: str = "user"
     scopes: List[str] = []
 
 
@@ -79,16 +78,10 @@ async def login_for_session_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Get scopes based on user role
-    scopes = form_data.scopes or []
-    if user.role == "admin":
-        scopes.append("admin")
-    
     # Create session token
     token = create_session_token(
         username=user.username,
-        scopes=scopes,
-        additional_data={"role": user.role}
+        scopes=user.scopes
     )
     
     # Calculate expiration time for response
@@ -142,7 +135,6 @@ async def get_current_user(
         email=user.email,
         full_name=user.full_name,
         disabled=user.disabled,
-        role=user.role,
         scopes=token_data.get("scopes", [])
     )
 

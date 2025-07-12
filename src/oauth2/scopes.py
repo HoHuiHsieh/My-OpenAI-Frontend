@@ -16,34 +16,37 @@ class Scopes(str, Enum):
     """Enumeration of available API scopes."""
     ADMIN = "admin"
     MODELS_READ = "models:read"
-    CHAT_READ = "chat:read"
-    EMBEDDINGS_READ = "embeddings:read"
+    CHAT_BASE = "chat:base"
+    CHAT_AGENT_MYTEST = "chat:agent:my-agent-for-test"
+    CHAT_AGENT_MYDOC = "chat:agent:my-doc-agent"
+    EMBEDDINGS_BASE = "embeddings:base"
 
 
 # Get available scopes
 available_scopes = [
     Scopes.ADMIN,
     Scopes.MODELS_READ,
-    Scopes.CHAT_READ,
-    Scopes.EMBEDDINGS_READ
-]
-
-# Define admin scopes
-admin_scopes = available_scopes
-
-# Define user scopes
-user_scopes = [
-    Scopes.MODELS_READ,
-    Scopes.CHAT_READ,
-    Scopes.EMBEDDINGS_READ
+    Scopes.CHAT_BASE,
+    Scopes.CHAT_AGENT_MYTEST,
+    Scopes.CHAT_AGENT_MYDOC,
+    Scopes.EMBEDDINGS_BASE
 ]
 
 # Map of scope to description for documentation
 scope_descriptions: Dict[str, str] = {
     Scopes.ADMIN: "Full administrative access",
     Scopes.MODELS_READ: "Read access to model endpoints",
-    Scopes.CHAT_READ: "Read access to chat endpoints",
-    Scopes.EMBEDDINGS_READ: "Read access to embedding endpoints"
+    Scopes.CHAT_BASE: "Base access to chat endpoints",
+    Scopes.CHAT_AGENT_MYTEST: "Access to My Test Agent chat endpoints",
+    Scopes.CHAT_AGENT_MYDOC: "Access to My Doc Agent chat endpoints",
+    Scopes.EMBEDDINGS_BASE: "Base access to embedding endpoints"
+}
+
+# 
+chat_completion_scopes: Set[str] = {
+    Scopes.CHAT_BASE,
+    Scopes.CHAT_AGENT_MYTEST,
+    Scopes.CHAT_AGENT_MYDOC
 }
 
 

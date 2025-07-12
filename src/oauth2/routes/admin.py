@@ -15,7 +15,7 @@ from logger import get_logger
 from ..db import get_db
 from ..db.operations import get_user_by_username, create_token_for_user
 from ..token_manager import create_access_token, token_type_access, decode_token
-from ..rbac import verify_scopes
+from ..scope_control import verify_scopes
 from ..db.operations import get_all_users
 from ..db.operations import get_user_by_username
 from ..db.operations import create_user
@@ -23,6 +23,7 @@ from ..db.operations import update_user
 from ..db.operations import delete_user
 from ..db.models import Token, User
 from ..db.operations import delete_user_token
+from ..scopes import available_scopes
 from . import admin_router
 
 # Initialize logger
@@ -34,18 +35,18 @@ class UserCreate(BaseModel):
     """User creation request model."""
     username: str
     password: str
-    email: Optional[EmailStr] = None
+    scopes: List[str]
+    disabled: bool
     full_name: Optional[str] = None
-    role: str = "user"
-    disabled: bool = False
-
+    email: Optional[EmailStr] = None
+    
 
 class UserUpdate(BaseModel):
     """User update request model."""
-    email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     password: Optional[str] = None
-    role: Optional[str] = None
+    scopes: List[str] = []
+    email: Optional[EmailStr] = None
     disabled: Optional[bool] = None
 
 
@@ -54,8 +55,8 @@ class UserResponse(BaseModel):
     username: str
     email: Optional[str] = None
     full_name: Optional[str] = None
-    role: str = "user"  # Default to 'user' role if None
     disabled: bool = False  # Default to not disabled if None
+    scopes: List[str] = []
     created_at: datetime
     updated_at: datetime
 
@@ -124,8 +125,8 @@ async def list_users(
             username=user.username,
             email=user.email,
             full_name=user.full_name,
-            role=user.role if user.role is not None else "user",
             disabled=user.disabled if user.disabled is not None else False,
+            scopes=user.scopes,
             created_at=user.created_at,
             updated_at=user.updated_at
         )
@@ -166,7 +167,7 @@ async def get_user(
         username=user.username,
         email=user.email,
         full_name=user.full_name,
-        role=user.role if user.role is not None else "user",
+        scopes=user.scopes,
         disabled=user.disabled if user.disabled is not None else False,
         created_at=user.created_at,
         updated_at=user.updated_at
@@ -193,6 +194,7 @@ async def create_new_user(
     Raises:
         HTTPException: If user creation fails
     """
+    print(f"Creating user: {user_data}")
     
     # Check if user already exists
     existing_user = get_user_by_username(db, user_data.username)
@@ -210,8 +212,8 @@ async def create_new_user(
         password=user_data.password,
         email=user_data.email,
         full_name=user_data.full_name,
-        role=user_data.role,
-        disabled=user_data.disabled
+        disabled=user_data.disabled,
+        scopes=user_data.scopes
     )
     
     if user is None:
@@ -225,7 +227,7 @@ async def create_new_user(
         username=user.username,
         email=user.email,
         full_name=user.full_name,
-        role=user.role if user.role is not None else "user",
+        scopes=user.scopes,
         disabled=user.disabled if user.disabled is not None else False,
         created_at=user.created_at,
         updated_at=user.updated_at
@@ -254,8 +256,6 @@ async def update_user_info(
     Raises:
         HTTPException: If user update fails
     """
-    print(username, user_data)
-    
     # Check if user exists
     existing_user = get_user_by_username(db, username)
     if not existing_user:
@@ -287,7 +287,7 @@ async def update_user_info(
         username=user.username,
         email=user.email,
         full_name=user.full_name,
-        role=user.role if user.role is not None else "user",
+        scopes=user.scopes,
         disabled=user.disabled if user.disabled is not None else False,
         created_at=user.created_at,
         updated_at=user.updated_at
@@ -426,8 +426,9 @@ async def create_access_token_for_user(
             detail=f"User {username} not found"
         )
     
-    # Determine if token is for admin user
-    is_admin = user.role == "admin"
+    # Determine if token is for admin user based on requested scopes
+    from ..scopes import Scopes
+    is_admin = Scopes.ADMIN.value in token_request.scopes
     
     # Create access token
     token = create_access_token(
@@ -492,7 +493,6 @@ async def revoke_access_token(
     Raises:
         HTTPException: If token revocation fails
     """
-    print(f"Revoke access token for user: {username}, token_id: {token_id}")
     # Check if user exists
     user = get_user_by_username(db, username)
     if user is None:
@@ -515,3 +515,22 @@ async def revoke_access_token(
     
     admin_username = token_data.get("sub")
     logger.info(f"Admin {admin_username} revoked token {token_id} for user: {username}")
+
+
+@admin_router.get("/scopes", response_model=List[str])
+async def get_available_scopes(
+    token_data: Dict[str, Any] = Security(verify_scopes, scopes=["admin"]),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all available scopes.
+
+    Args:
+        token_data: Verified token data (must have admin scope)
+        db: Database session
+
+    Returns:
+        List[str]: List of available scopes
+    """
+    logger.info(f"Admin {token_data.get('sub')} retrieved available scopes")
+    return available_scopes

@@ -41,7 +41,8 @@ app = FastAPI(
 @app.get("/", response_model=CreateModelListResponse, summary="List available models")
 @app.get("", response_model=CreateModelListResponse, summary="List available models")
 async def models_root(
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Security(get_current_active_user,
+                                  scopes=["models:read"])
 ):
     """
     List all available models from configured model providers.
@@ -60,6 +61,8 @@ async def models_root(
     Raises:
         HTTPException: If all target servers fail to respond or unauthorized access
     """
+    print("models_root called", current_user.full_name, current_user.scopes)
+
     # Extract the original request data and log the request
     logger.info(
         f"Received request to list all models from user: {current_user.username}")
@@ -79,6 +82,12 @@ async def models_root(
             logger.warning(
                 f"Model server {key} does not have a valid response configuration.")
             continue
+
+        # Check if the user has permission to access this model
+        if "admin" not in current_user.scopes:
+            if not set(model.get('type', [])).intersection(current_user.scopes):
+                logger.debug(f"User {current_user.username} does not have required scopes for model {key}. Skipping.")
+                continue
 
         try:
             # Extract the target model response data and convert to ModelInfo

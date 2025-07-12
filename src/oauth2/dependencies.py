@@ -12,7 +12,7 @@ from typing import Optional
 from logger import get_logger
 from .db import get_db
 from .db.models import User
-from .rbac import verify_scopes
+from .scope_control import verify_scopes, require_scopes
 from .db.operations import get_user_by_username
 
 # Initialize logger

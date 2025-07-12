@@ -12,7 +12,7 @@ from functools import wraps
 
 from logger import get_logger
 from ..token_manager import verify_token
-from ..rbac import verify_scopes
+from ..scope_control import verify_scopes
 
 # Initialize logger
 logger = get_logger(__name__)

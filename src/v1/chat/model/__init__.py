@@ -288,7 +288,7 @@ class TritonConnection():
                         callback, 
                         client, 
                         tokenizor_infer,
-                        timeout=120,
+                        timeout=300,
                         stop_dict=body.stop,
                         max_tokens=max_tokens,
                         request_id=request_id
@@ -329,6 +329,7 @@ class TritonConnection():
                 try:
                     complete_response = await task
                     if complete_response:
+                        print(f"Parallel response received: {complete_response}")
                         responses.append(complete_response)
                     else:
                         logger.warning("Empty response from parallel request")
@@ -428,7 +429,7 @@ class TritonConnection():
                 tools=tools,
                 parallel_tool_calls=parallel_tool_calls,
                 response_format=response_format,
-                timeout=120,
+                timeout=300,
                 stop_dict=body.stop,
                 max_tokens=max_tokens,
                 ignore_usage=ignore_usage,

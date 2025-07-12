@@ -11,6 +11,7 @@ from config import get_config
 from .db import Base, engine, get_db
 from .db.operations import get_user_by_username, create_user
 
+
 # Initialize logger
 logger = get_logger(__name__)
 
@@ -87,8 +88,8 @@ def create_default_admin():
                 password=password,
                 email=email,
                 full_name=full_name,
-                role="admin",
-                disabled=disabled
+                disabled=disabled,
+                scopes=["admin"]
             )
             
             if admin_user:

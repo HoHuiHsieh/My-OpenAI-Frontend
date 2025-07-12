@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from logger import get_logger
 from config import get_config
 from ..auth import get_password_hash
+from ..scopes import Scopes
 from .models import User, Token
 
 # Initialize logger
@@ -74,13 +75,13 @@ def create_user(
     db: Session,
     username: str,
     password: str,
+    scopes: List[str],
     email: Optional[str] = None,
     full_name: Optional[str] = None,
-    role: str = "user",
-    disabled: bool = False
+    disabled: bool = False,    
 ) -> Optional[User]:
     """
-    Create a new user.
+    Create a new user with required scopes.
     
     Args:
         db: Database session
@@ -88,8 +89,8 @@ def create_user(
         password: Plain password for the new user
         email: Email for the new user
         full_name: Full name of the new user
-        role: Role for the new user (user, admin)
         disabled: Whether the user is disabled
+        scopes: List of scopes for the user (required)
         
     Returns:
         Optional[User]: Created user or None if creation failed
@@ -107,6 +108,11 @@ def create_user(
             if existing_email:
                 logger.warning(f"User creation failed: Email {email} already in use")
                 return None
+            
+        # Validate scopes
+        if not scopes or not isinstance(scopes, list):
+            logger.warning(f"User creation failed: Invalid scopes for user {username}")
+            return None
         
         # Hash the password
         hashed_password = get_password_hash(password)
@@ -117,8 +123,8 @@ def create_user(
             hashed_password=hashed_password,
             email=email,
             full_name=full_name,
-            role=role,
-            disabled=disabled
+            disabled=disabled,
+            scopes=scopes
         )
         
         # Add to database
@@ -126,7 +132,7 @@ def create_user(
         db.commit()
         db.refresh(user)
         
-        logger.info(f"Created new user: {username} with role {role}")
+        logger.info(f"Created new user: {username} with scopes: {scopes}")
         return user
     except SQLAlchemyError as e:
         db.rollback()
@@ -431,3 +437,30 @@ def check_token_revoked(db: Session, token_value: str) -> bool:
     except SQLAlchemyError as e:
         logger.error(f"Error checking token revocation status: {str(e)}")
         return False
+
+
+def get_default_user_scopes(username: str) -> List[str]:
+    """
+    Get default scopes for a user.
+    
+    This function determines the default scopes a user should have.
+    In the new scope-based system, users get basic scopes by default.
+    Admin privileges are managed through specific scope assignments.
+    
+    Args:
+        username: The username to get scopes for
+        
+    Returns:
+        List[str]: List of default scopes for the user
+    """
+    # Default scopes for all users
+    default_scopes = [
+        Scopes.MODELS_READ.value,
+        Scopes.CHAT_BASE.value,
+        Scopes.EMBEDDINGS_BASE.value
+    ]
+    
+    # TODO: Add logic to determine if user should have admin scope
+    # This could be based on configuration, database flags, or other criteria
+    
+    return default_scopes

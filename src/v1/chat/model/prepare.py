@@ -56,13 +56,14 @@ def prepare_triton_inputs(
     inputs.append(buf)
 
     # Handle stop sequences
-    stop_sequences_bytes = []
+    stop_sequences_bytes = None
     if hasattr(body, 'stop') and body.stop:
-        if isinstance(body.stop, str):
+        if isinstance(body.stop, str) and body.stop:
             stop_sequences_bytes = [body.stop.encode('utf-8')]
-        elif isinstance(body.stop, list):
+        elif isinstance(body.stop, list) and len(body.stop) > 0:
             stop_sequences_bytes = [s.encode('utf-8') for s in body.stop]
-    if stop_sequences_bytes:
+
+    if stop_sequences_bytes is not None:
         buf = grpcclient.InferInput(
             "stop_words", [1, len(stop_sequences_bytes)], "BYTES")
         buf.set_data_from_numpy(
