@@ -44,10 +44,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
     try {
       // Call the authApi login endpoint directly
       const response = await sessionApi.login(username, password);
-
       // Update user information in local storage
       login(response.access_token)
-
       onClose();
     } catch (err) {
       console.error('Login error:', err);

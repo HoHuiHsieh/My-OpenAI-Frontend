@@ -212,7 +212,7 @@ export default function AdminPanel() {
     <>
       <Head>
         <title>Admin Panel - AI Platform</title>
-        <link rel="icon" href={`${IMAGE_BASE_URL}/favicon.ico`} />
+        {/* <link rel="icon" href={`${IMAGE_BASE_URL}/favicon.ico`} /> */}
       </Head>
 
       <Header

@@ -57,9 +57,8 @@ const Header: React.FC<HeaderProps> = ({
               src={TitleIcon}
               alt="AI Platform Logo"
               fill
-              sizes="40px"
+              sizes="50px"
               style={{ objectFit: "contain" }}
-              priority
             />
           </Box>
           <Typography variant="h6" component="div">

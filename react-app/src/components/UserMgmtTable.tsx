@@ -29,7 +29,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  SelectChangeEvent,
+  OutlinedInput,
   Tooltip,
   Switch,
   FormControlLabel,
@@ -54,26 +54,26 @@ interface UserCreate {
   password: string;
   email?: string;
   full_name?: string;
-  role?: string;
-  disabled?: boolean;
+  disabled: boolean;
+  scopes: string[]; // Added scopes property
 }
 
 interface UserUpdate {
   email?: string;
   full_name?: string;
   password?: string;
-  role?: string;
   disabled?: boolean;
+  scopes: string[]; // Added scopes property
 }
 
 interface UserResponse {
   username: string;
   email?: string;
   full_name?: string;
-  role: string;
   disabled: boolean;
   created_at: string;
   updated_at: string;
+  scopes: string[]; // Added scopes property
 }
 
 /**
@@ -110,16 +110,16 @@ const UserMgmtTable: React.FC<{}> = () => {
     password: '',
     email: '',
     full_name: '',
-    role: 'user',
     disabled: false,
+    scopes: [], // Added scopes property
   });
 
   const [editUser, setEditUser] = useState<UserUpdate & { username: string }>({
     username: '',
     email: '',
     full_name: '',
-    role: '',
     disabled: false,
+    scopes: [] // Added scopes property
   });
 
   const [passwordChange, setPasswordChange] = useState({
@@ -141,8 +141,8 @@ const UserMgmtTable: React.FC<{}> = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await adminApi.listUsers(0, 100); // Add explicit pagination parameters
-      setUsers(response);
+      const users = await adminApi.listUsers(0, 100); // Add explicit pagination parameters
+      setUsers(users);
     } catch (err) {
       setError('Failed to load users. Please try again later.');
       console.error('Error fetching users:', err);
@@ -169,8 +169,8 @@ const UserMgmtTable: React.FC<{}> = () => {
         password: '',
         email: '',
         full_name: '',
-        role: 'user',
         disabled: false,
+        scopes: [], // Added scopes property
       });
     } catch (err) {
       setError('Failed to create user.');
@@ -252,17 +252,9 @@ const UserMgmtTable: React.FC<{}> = () => {
     setNewUser(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleRoleChange = (e: SelectChangeEvent) => {
-    setNewUser(prev => ({ ...prev, role: e.target.value }));
-  };
-
   const handleEditUserChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setEditUser(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleEditRoleChange = (e: SelectChangeEvent) => {
-    setEditUser(prev => ({ ...prev, role: e.target.value }));
   };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -276,8 +268,8 @@ const UserMgmtTable: React.FC<{}> = () => {
       username: user.username,
       email: user.email || '',
       full_name: user.full_name || '',
-      role: user.role,
       disabled: user.disabled,
+      scopes: user.scopes || [], // Ensure scopes is an array
     });
     setOpenEditDialog(true);
   };
@@ -295,6 +287,22 @@ const UserMgmtTable: React.FC<{}> = () => {
     setDeleteUsername(username);
     setOpenDeleteDialog(true);
   };
+
+  // Fetched available scopes
+  const [availableScopes, setAvailableScopes] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchAvailableScopes = async () => {
+      try {
+        const scopes = await adminApi.getAvailableScopes(); // Adjust the endpoint if necessary
+        setAvailableScopes(scopes);
+      } catch (error) {
+        console.error('Failed to fetch available scopes:', error);
+      }
+    };
+
+    fetchAvailableScopes();
+  }, []);
 
   // Formatted date helper
   const formatDate = (dateString: string) => {
@@ -353,7 +361,6 @@ const UserMgmtTable: React.FC<{}> = () => {
               <TableCell>Username</TableCell>
               <TableCell>Full Name</TableCell>
               <TableCell>Email</TableCell>
-              <TableCell>Role</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Created</TableCell>
               <TableCell>Updated</TableCell>
@@ -363,7 +370,7 @@ const UserMgmtTable: React.FC<{}> = () => {
           <TableBody>
             {loading && users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={7} align="center">
                   <CircularProgress size={24} sx={{ my: 2 }} />
                 </TableCell>
               </TableRow>
@@ -382,13 +389,6 @@ const UserMgmtTable: React.FC<{}> = () => {
                     <TableCell>{user.username}</TableCell>
                     <TableCell>{user.full_name || '-'}</TableCell>
                     <TableCell>{user.email || '-'}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={user.role}
-                        color={user.role === 'admin' ? 'primary' : 'default'}
-                        size="small"
-                      />
-                    </TableCell>
                     <TableCell>
                       <Chip
                         label={user.disabled ? 'Inactive' : 'Active'}
@@ -490,6 +490,30 @@ const UserMgmtTable: React.FC<{}> = () => {
               onChange={handleNewUserChange}
               required
             />
+            <FormControl fullWidth margin="dense">
+              <InputLabel id="scopes-label">Scopes</InputLabel>
+              <Select
+                labelId="scopes-label"
+                id="scopes"
+                multiple
+                value={newUser.scopes}
+                onChange={(e) => setNewUser({ ...newUser, scopes: e.target.value as string[] })}
+                input={<OutlinedInput label="Chip" />}
+                renderValue={(selected) => (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((value) => (
+                      <Chip key={value} label={value} />
+                    ))}
+                  </Box>
+                )}
+              >
+                {availableScopes.map((scope) => (
+                  <MenuItem key={scope} value={scope}>
+                    {scope}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <TextField
               margin="dense"
               id="email"
@@ -512,20 +536,6 @@ const UserMgmtTable: React.FC<{}> = () => {
               value={newUser.full_name}
               onChange={handleNewUserChange}
             />
-            <FormControl fullWidth margin="dense">
-              <InputLabel id="role-label">Role</InputLabel>
-              <Select
-                labelId="role-label"
-                id="role"
-                name="role"
-                value={newUser.role || 'user'}
-                onChange={handleRoleChange}
-                label="Role"
-              >
-                <MenuItem value="admin">Admin</MenuItem>
-                <MenuItem value="user">User</MenuItem>
-              </Select>
-            </FormControl>
             <FormControlLabel
               control={
                 <Switch
@@ -575,17 +585,27 @@ const UserMgmtTable: React.FC<{}> = () => {
               onChange={handleEditUserChange}
             />
             <FormControl fullWidth margin="dense">
-              <InputLabel id="edit-role-label">Role</InputLabel>
+              <InputLabel id="edit-scopes-label">Scopes</InputLabel>
               <Select
-                labelId="edit-role-label"
-                id="edit-role"
-                name="role"
-                value={editUser.role || 'user'}
-                onChange={handleEditRoleChange}
-                label="Role"
+                labelId="edit-scopes-label"
+                id="edit-scopes"
+                multiple
+                value={editUser.scopes}
+                onChange={(e) => setEditUser({ ...editUser, scopes: e.target.value as string[] })}
+                input={<OutlinedInput label="Chip" />}
+                renderValue={(selected) => (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((value) => (
+                      <Chip key={value} label={value} />
+                    ))}
+                  </Box>
+                )}
               >
-                <MenuItem value="admin">Admin</MenuItem>
-                <MenuItem value="user">User</MenuItem>
+                {availableScopes.map((scope) => (
+                  <MenuItem key={scope} value={scope}>
+                    {scope}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
             <FormControlLabel

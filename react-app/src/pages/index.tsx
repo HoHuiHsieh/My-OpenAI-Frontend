@@ -43,34 +43,32 @@ export default function Home() {
    * @param serviceId - The ID of the clicked service.
    */
   const handleServiceClick = (serviceId: string) => {
-    alert(`You clicked on ${serviceId} service. This would navigate to the actual service in a full implementation.`);
+    switch (serviceId) {
+      case 'n8n':
+        window.open('/n8n', '_blank');
+        break;
+      case 'openwebui':
+        window.open('/', '_blank');
+        break;
+      default:
+        console.warn(`No action defined for service: ${serviceId}`);
+        break;
+    }
   };
 
   // Sample service data
   const services = [
     {
-      id: 'chat',
-      title: 'Chat Service',
-      description: 'Access AI-powered conversational capabilities',
-      image: getServiceIcon('chat', '/images/icons/chat.png'),
+      id: 'n8n',
+      title: 'n8n',
+      description: 'Automate workflows with n8n integration',
+      image: getServiceIcon('n8n', '/images/icons/n8n.png'),
     },
     {
-      id: 'embeddings',
-      title: 'Embeddings',
-      description: 'Generate vector embeddings for text and images',
-      image: getServiceIcon('embeddings', '/images/icons/embeddings.png'),
-    },
-    {
-      id: 'audio',
-      title: 'Speech Services',
-      description: 'Text-to-Speech and Speech-to-Text capabilities',
-      image: getServiceIcon('audio', '/images/icons/audio.png'),
-    },
-    {
-      id: 'image',
-      title: 'Image Generation',
-      description: 'Generate images from text descriptions',
-      image: getServiceIcon('image', '/images/icons/image.png'),
+      id: 'openwebui',
+      title: 'OpenWebUI',
+      description: 'Access OpenWebUI for web-based AI interactions',
+      image: getServiceIcon('openwebui', '/images/icons/openwebui.png'),
     },
   ];
 
@@ -78,7 +76,7 @@ export default function Home() {
     <>
       <Head>
         <title>AI Platform Portal</title>
-        <link rel="icon" href={`${IMAGE_BASE_URL}/favicon.ico`} />
+        {/* <link rel="icon" href={`${IMAGE_BASE_URL}/favicon.ico`} /> */}
       </Head>
 
       {/* Header component */}

@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "WATCHPACK_POLLING=true next dev -p 8080",
-    "build": "NODE_ENV=production NEXT_PUBLIC_API_URL=/share BACK_SERVICE_API_URL=/ next build",
+    "dev": "WATCHPACK_POLLING=true next dev -H 0.0.0.0 -p 8080",
+    "build": "NODE_ENV=production next build",
     "start": "next start -p 8080",
     "build-static": "npm run build && npm run copy-static",
     "copy-static": "cp -r out/* ../share/",

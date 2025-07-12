@@ -13,22 +13,20 @@ interface UserCreate {
   password: string;
   email?: string;
   full_name?: string;
-  role?: string; // Default to "user" if not provided
   disabled?: boolean; // Default to false if not provided
 }
 interface UserUpdate {
   email?: string;
   full_name?: string;
   password?: string;
-  role?: string; // Optional, can be used to change user role
   disabled?: boolean; // Optional, can be used to disable/enable user
 }
 interface UserResponse {
   username: string;
   email?: string;
   full_name?: string;
-  role: string; // Default to "user" if not provided
   disabled: boolean; // Default to false if not provided
+  scopes: string[]; // Added scopes property
   created_at: string; // ISO format date
   updated_at: string; // ISO format date
 }
@@ -86,6 +84,10 @@ export const adminApi = {
 
   deleteAccessToken: (username: string, token_id: number): Promise<void> => {
     return api.delete(`/admin/access/${username}`, { params: { token_id } });
+  },
+
+  getAvailableScopes: (): Promise<string[]> => {
+    return api.get(`/admin/scopes`);
   }
 };
 
