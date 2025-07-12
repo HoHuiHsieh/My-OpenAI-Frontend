@@ -4,7 +4,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: my_openai_frontend:latest
+    image: my_openai_frontend:pydev
     container_name: my_openai_frontend
     volumes:
       - ../:/workspace
