@@ -2,163 +2,91 @@
 OAuth2 Authentication and Authorization Module
 
 This module handles authentication and authorization using OAuth2 protocol
-for the My OpenAI Frontend service. It provides functionality for:
-- Token validation
-- User authentication
-- Scope-based access control
-- Integration with various identity providers
-- PostgreSQL database integration for user management
+for the My OpenAI Frontend service. 
 
-Token Management:
-- Dual token system:
-  - Session tokens for webpage access (short-lived authentication)
-  - Access tokens for model APIs access with fine-grained scope control
-- Token configuration settings available in assets/config.yml
+
+It provides:
+- User Management
+  - With user information: 'username', 'password', 'scopes', 'email', 'fullname', 'active', etc. fields
+  - User registration, login, and management
+  - Scope-based access control
+  - PostgreSQL database integration for user data
+  - Add default admin user if not exists
+  - User password hashing and verification
+- Token Management
+  - JWT token support
+  - OAuth2 token generation and validation
+  - PostgreSQL database integration for refresh tokens
+
+OAuth2 configuration settings available in src/config module
 
 Module Structure:
-- auth.py:                     Core authentication functionality
+- __init__.py:                 This file initializes the OAuth2 module
 - token_manager/
   - __init__.py:               Token manager package initialization
-  - base.py:                   Common token functionality
-  - session.py:                Short-lived session tokens for web access
-  - access.py:                 API access tokens with scope control
-- db/
-  - __init__.py:               Database package initialization
-  - models.py:                 User and token data models
-  - operations.py:             Database operations
-- scope_control.py:            Scope-based access control
-- scopes.py:                   API scope definitions and management
-- middleware.py:               Authentication middleware
+  - manager.py:                Token management logic
+  - models.py:                 Token data models
+  - database.py:               Database setup and token model
+- user_management/
+  - __init__.py:               User management package initialization
+  - manager.py:                User management logic
+  - models.py:                 User data models
+  - database.py:               Database setup and user model
+  - scopes.py:                 User scopes ('admin', 'models:read', 'chat:base', 'embeddings:base', etc.)
 - routes/
   - __init__.py:               Routes package initialization
-  - session.py:                Session token endpoints (/session, /session/user)
-  - access.py:                 Access token endpoints (/access/*)
-  - admin.py:                  Admin endpoints (/admin/*)
-  - validator.py:              Request validation middleware
-
+  - auth.py:                   Oauth2 tokens validation and refresh endpoints
+  - user.py:                   User management endpoints
+  - admin.py:                  Admin management endpoints
+  - middleware.py:             Middleware for user information extraction from access token
 
 API Endpoints:
-- POST /session:            Login endpoint to obtain session tokens
+- POST /auth/refresh:         Refresh access token endpoint
+- POST /user/login:           User login endpoint
 
-API Endpoints (require login):
-- GET  /session/user:       Endpoint to get current user information with session token
-- POST /access/refresh:     Endpoint to refresh access tokens
-- POST /access/info:        Endpoint to get access token information
-
-Admin API Endpoints (require admin role):
-- GET  /admin/users:                List all users
-- GET  /admin/users/{username}:     Get user information by username
-- POST /admin/users:                Create a new user
-- PUT  /admin/users/{username}:     Update user information
-- DELETE /admin/users/{username}:   Delete a user
-- GET  /admin/access:               List all access tokens
-- POST /admin/access/{username}:    Create access token for a user
-- DELETE /admin/access/{username}:  Revoke access token for a user
-
+API Endpoints (require access token in header):
+- GET /auth:                  Access token validation endpoint
+- GET /user:                  Get current user information endpoint
+- GET /user/scopes:           Get all available scopes endpoint
+- PUT /user:                  Update current user information endpoint
+- GET /admin/users:           List all users endpoint
+- POST /admin/users:          Create new user endpoint
+- GET /admin/users/{username}: Get user information by username endpoint
+- PUT /admin/users/{username}: Update user information endpoint
+- DELETE /admin/users/{username}: Delete user endpoint
 """
 
-from fastapi.security import OAuth2PasswordBearer, SecurityScopes
-from passlib.context import CryptContext
-from config import get_config
-from logger import get_logger
-from .scopes import available_scopes
+# Export routers and middleware for application integration
+from .routes import auth_router, user_router, admin_router
+from .routes.middleware import get_current_user, get_current_active_user, get_admin_user
+from .token_manager import TokenManager
+from .user_management import UserManager, SCOPES, User, UserDB
 
 
-# Initialize the enhanced logging system
-logger = get_logger(__name__)
+# Initialize managers for direct usage
+token_manager = TokenManager()
+user_manager = UserManager()
 
-# Load OAuth2 config
-config = get_config()
-oauth2_config = config.get("oauth2", {})
 
-# Initialize OAuth2 components
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="session",
-    scopes={scope: scope for scope in available_scopes},
-)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+def setup_database():
+    """Initialize all database tables"""
+    from .token_manager.database import init_database as init_token_db
+    from .user_management.database import init_database as init_user_db
+    
+    # Initialize databases
+    init_token_db()
+    init_user_db()
 
-# Import token managers first to avoid circular imports
-from .token_manager import (
-    create_session_token,
-    create_access_token, 
-    verify_token,
-    decode_token,
-    token_type_session,
-    token_type_access
-)
-
-# Import auth and middleware
-from .auth import verify_password, get_password_hash, authenticate_user
-from .middleware import OAuth2Middleware
-
-# Import scopes
-from .scopes import Scopes, available_scopes
-
-# Import scope-based access control
-from .scope_control import (
-    ScopeBasedAccessControl,
-    scope_control,
-    verify_scopes,
-    require_scopes,
-    require_admin,
-    require_models_read,
-    require_chat_read,
-    require_embeddings_read
-)
-
-# Import database models and operations
-from .db.models import User, Token
-from .db.operations import (
-    get_user_by_username,
-    get_user_by_email,
-    create_user,
-    update_user,
-    delete_user,
-    get_all_users,
-    get_user_tokens,
-    create_token_for_user,
-    delete_user_token,
-    check_token_revoked
-)
-
-# Import user dependencies for v1 API
-from .dependencies import get_current_user, get_current_active_user
-
-# Create router objects and export them
-from .routes import session_router, access_router, admin_router
 
 __all__ = [
-    # Core auth functions
-    "verify_password", "get_password_hash", "authenticate_user",
-    
-    # Middleware
-    "OAuth2Middleware",
-    
-    # Scope-based access control
-    "ScopeBasedAccessControl", "verify_scopes", "scope_control", "require_scopes",
-    "require_admin", "require_models_read", "require_chat_read", "require_embeddings_read",
-    
-    # Scopes
-    "Scopes", "available_scopes",
-    
-    # Token management
-    "create_session_token", "create_access_token", 
-    "verify_token", "decode_token",
-    "token_type_session", "token_type_access",
-      # Database models and operations
-    "User", "Token",
-    "get_user_by_username", "get_user_by_email",
-    "create_user", "update_user", "delete_user",
-    "get_all_users", "get_user_tokens",
-    "create_token_for_user", "delete_user_token", "check_token_revoked",
-    
-    # User dependencies
-    "get_current_user", "get_current_active_user",
-    
-    # Routers
-    "session_router", "access_router", "admin_router",
-    
-    # FastAPI requirements
-    "oauth2_scheme", "SecurityScopes"
+    "auth_router",
+    "user_router", 
+    "admin_router",
+    "get_current_user",
+    "get_current_active_user", 
+    "get_admin_user",
+    "token_manager",
+    "user_manager",
+    "setup_database",
+    "SCOPES"
 ]

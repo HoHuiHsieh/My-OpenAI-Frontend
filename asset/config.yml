@@ -1,80 +1,70 @@
-# OAuth2 Authentication Configuration
+# Authentication Configuration
 oauth2:
-  secret_key: your-secret-key-placeholder
+  enable: true  # Set to false to disable authentication (for development)
+  secret_key: my-secret-key
   algorithm: HS256
-  access_token_expire_minutes: 30  # Short-lived token for regular sessions
-  user_token_expire_days: 180      # 6 months expiration for user tokens
-  admin_token_never_expires: false  # Admin tokens never expire
-  enable_authentication: true  # Set to false to disable authentication (for development)
-  exclude_paths:
-    - "/share"
-    - "/docs"
-    - "/session"
-    - "/openapi.json"
+  access_token_expire_time: 3600  # 1 hour expiration for access tokens
+  refresh_token_expire_time: 2592000  # 30 days expiration for refresh tokens
   
   # Default admin user settings
   default_admin:
     username: admin
-    email: your@email.com
-    full_name: YourName
+    email: <admin_email>
+    full_name: <admin_full_name>
     disabled: false
-    password: secret  # This will be hashed during initialization
+    password: <admin_password>
 
-# Database Configuration
+# PostgreSQL Database Configuration
 database:
-  engine: postgresql
   host: postgres
   port: 5432
   username: postgresql
   password: password
-  name: ai_platform_auth
-  ssl_mode: prefer          # Options: disable, prefer, require, verify-ca, verify-full
+  database: ai_platform_auth
   table_prefix: "myopenaiapi"  # Prefix for tables in the database
-
-# Model Configuration
-models:
-  llama-3.1-8b-instruct:
-    host: 192.168.1.201
-    port: 8001
-    type: ["chat"]
-    response:
-      id: "meta/llama-3.1-8b-instruct"
-      created: 0
-      object: "model"
-      owned_by: "organization-owner"
-  nv-embed-v2:
-    host: 192.168.1.202
-    port: 8001
-    type: ["embedding"]
-    args:
-      instruction: "Given a question, retrieve passages that answer the question."
-    response:
-      id: "nvidia/nv-embed-v2"
-      created: 0
-      object: "model"
-      owned_by: "organization-owner"
-  my-doc-agent:
-    host: 192.168.1.203
-    port: 8000
-    type: ["chat:agent:my-doc-agent"]
-    response:
-      id: "my-agent/my-doc-agent"
-      created: 1750907439
-      object: "model"
-      owned_by: "organization-owner"
 
 # Logging Configuration
 logging:
-  level: "INFO"  # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
-  use_database: true  # Whether to log to the database
-  async_logging: true  # Use asynchronous logging for better performance
-  table_prefix: "myopenaiapi"  # Prefix for log tables in the database
-  log_retention_days: 365  # How many days to keep logs in the database
+  level: "DEBUG"  # Global logging level if not overridden by components
+  database:
+    enabled: true  # Enable logging to the database
+    retention_days: 365  # How many days to keep logs in the database
   console:
     enabled: true  # Always log to console as a fallback
     format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   components:
-    auth: "INFO"
+    authentication: "DEBUG"
     database: "INFO"
-    middleware: "INFO"
-    controller: "WARNING"
+    models: "INFO"
+
+# Model Configuration
+models:
+  llama-3.3-70b-instruct:
+    host: <llama_host_ip>
+    port: 8001
+    type: ["chat:base"]
+    response:
+      id: "meta/llama-3.3-70b-instruct"
+      created: 1749095099
+      object: "model"
+      owned_by: "organization-owner"
+  nv-embed-v2:
+    host: <nv_embed_host_ip>
+    port: 9001
+    type: ["embeddings:base"]
+    args:
+      instruction: "Given a question, retrieve passages that answer the question."
+    response:
+      id: "nvidia/nv-embed-v2"
+      created: 1749095099
+      object: "model"
+      owned_by: "organization-owner"
+  whisper-large-v3-turbo:
+    host: <whisper_host_ip>
+    port: 8001
+    type: ["audio:transcription"]
+    response:
+      id: "openai/whisper-large-v3-turbo"
+      created: 1749095099
+      object: "model"
+      owned_by: "organization-owner"

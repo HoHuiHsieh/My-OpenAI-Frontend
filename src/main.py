@@ -2,57 +2,51 @@
 Main FastAPI application entry point.
 This file imports and mounts FastAPI applications from subfolders.
 """
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
-from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from v1 import v1_router
-from oauth2.routes.session import session_router
-from oauth2.routes.access import access_router
-from oauth2.routes.admin import admin_router
-from oauth2.middleware import OAuth2Middleware as AuthMiddleware
-from oauth2.migrations import initialize_database
 from config import get_config
-from logger import get_logger, UsageLogger
-from statistic import statistic_router
-from constant import DEFAULT_SHARE_PATH
-import os
+from logger import get_logger, initialize_logger, shutdown_logging
+from usage import (
+    usage_user_router,
+    usage_admin_router,
+    initialize_usage_logger,
+    shutdown_usage_logger
+)
+from v1 import v1_router
+from apikey import apikey_router, init_database as init_apikey_database
+from oauth2 import auth_router, user_router, admin_router, setup_database as init_auth_database
+from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
+import sys
+from pathlib import Path
 
+# Add the workspace root to Python path so we can import src modules
+workspace_root = Path(__file__).parent.parent
+sys.path.insert(0, str(workspace_root))
 
-# Initialize enhanced logging system
-logger = get_logger(__name__)
-logger.info("Starting My OpenAI Frontend API application")
-
-# Load configuration
-config = get_config()
-oauth2_config = config.get("oauth2", {})
-enable_auth = oauth2_config.get("enable_authentication", True)
-exclude_paths = oauth2_config.get("exclude_paths", [])
 
 # Define the lifespan context manager
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup logic
-    try:
-        # Initialize OAuth2 database
-        initialize_database()
-        
-        # Initialize usage logging system
-        logger.info("Initializing usage logging system...")
-        UsageLogger.initialize()
-        logger.info("Usage logging system initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize database or usage logger: {e}", exc_info=True)
-        # Continue startup even if initialization fails
-        # This allows the application to start and use in-memory fallbacks if necessary
+    """
+    Lifespan context manager for FastAPI application.
+    """
+    # Initialize logging system
+    initialize_logger(get_config())
+    initialize_usage_logger()
+    logger = get_logger(__name__)
+    logger.info("Starting My OpenAI Frontend API application")
 
-    yield  # The application runs here
+    # Initialize database
+    init_auth_database()
+    init_apikey_database()
+    logger.info("Database initialized")
+
+    # The application runs here
+    yield
 
     # Shutdown logic (if needed)
-    # Any cleanup code would go here
+    shutdown_logging()
+    shutdown_usage_logger()
 
 # Create the main FastAPI application
 app = FastAPI(
@@ -65,14 +59,14 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Include OAuth2 authentication and admin routes
-app.include_router(session_router)
-app.include_router(access_router)
+# Include routes
+app.include_router(auth_router)
+app.include_router(user_router)
 app.include_router(admin_router)
-
-# Add authentication middleware if enabled in config
-if enable_auth:
-    app.add_middleware(AuthMiddleware, exclude_paths=exclude_paths)
+app.include_router(apikey_router)
+app.include_router(v1_router)
+app.include_router(usage_user_router)
+app.include_router(usage_admin_router)
 
 # Configure CORS middleware - must be added AFTER AuthMiddleware to process CORS first
 app.add_middleware(
@@ -82,51 +76,6 @@ app.add_middleware(
     allow_methods=["*"],  # Allow all methods
     allow_headers=["*"],  # Allow all headers
 )
-
-# Include the v1 router (protected by the authentication middleware)
-logger.info("Mounting v1 API router")
-app.include_router(v1_router)
-
-# Include usage statistics router
-logger.info("Mounting usage statistics router")
-app.include_router(statistic_router)
-
-# Custom StaticFiles class that redirects to index.html when path is '/'
-class IndexStaticFiles(StaticFiles):
-    async def get_response(self, path: str, scope):
-        if path == "":
-            return RedirectResponse(url=f"{scope['path']}index.html")
-        return await super().get_response(path, scope)
-
-# Mount static files directory if it exists
-if os.path.exists(DEFAULT_SHARE_PATH):
-    logger.info(f"Mounting static files from {DEFAULT_SHARE_PATH} under /share path")
-    app.mount("/share", IndexStaticFiles(directory=DEFAULT_SHARE_PATH), name="share")
-else:
-    logger.warning(f"Static files directory {DEFAULT_SHARE_PATH} does not exist, skipping mount")
-
-# Root endpoint redirects to share/index.html
-@app.get("/")
-async def root():
-    logger.debug("Root endpoint called")
-    
-    # Check if the share folder exists and has an index.html file
-    index_html_path = os.path.join(DEFAULT_SHARE_PATH, "index.html")
-    if os.path.exists(index_html_path):
-        logger.info(f"Redirecting root endpoint to /share/ (index.html found)")
-        # Redirect to the share folder root, which will serve index.html via our custom StaticFiles
-        return RedirectResponse(url="/share/")
-    
-    # Otherwise, serve the default API information
-    logger.info("Serving API information from root endpoint (no index.html found)")
-    response = {
-        "name": "My OpenAI Frontend API",
-        "version": "1.0.0",
-        "description": "A proxy service for Triton Inference Server with OAuth2 authentication",
-        "static_files": f"/share (serving files from {DEFAULT_SHARE_PATH})" if os.path.exists(DEFAULT_SHARE_PATH) else "Not available"
-    }
-    return response
-
 
 if __name__ == "__main__":
     import uvicorn
