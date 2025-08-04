@@ -1,10 +1,9 @@
 """
 Configuration manager class
 """
-
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional, List
-
 from .models import AuthenticationConfig, DatabaseConfig, LoggingConfig, ModelConfig
 from .loader import ConfigLoader
 
@@ -20,9 +19,12 @@ class Config:
             config_path: Path to config file. Defaults to asset/config.yml
         """
         if config_path is None:
-            # Default to asset/config.yml relative to project root
-            project_root = Path(__file__).parent.parent.parent
-            config_path = project_root / "asset" / "config.yml"
+            # load config with environment variable
+            config_path = os.getenv("ASSET_PATH", "asset/config.yml")
+            if not config_path:
+                # Fallback to default path if environment variable is not set
+                project_root = Path(__file__).parent.parent.parent
+                config_path = project_root / "asset" / "config.yml"
         
         self._config_path = Path(config_path)
         self._raw_config: Dict[str, Any] = {}

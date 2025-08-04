@@ -2,6 +2,7 @@
 Configuration loader and parser
 """
 
+import os
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -28,13 +29,22 @@ class ConfigLoader:
             return None
             
         auth_data = raw_config['oauth2']
+        default_admin_config = auth_data.get('default_admin', {})
+        default_admin = {
+            "username": os.getenv("ADMIN_USERNAME", default_admin_config.get("username", "admin")),
+            "password": os.getenv("ADMIN_PASSWORD", default_admin_config.get("password", "admin")),
+            "email": os.getenv("ADMIN_EMAIL", default_admin_config.get("email", "admin@example.com")),
+            "full_name": os.getenv("ADMIN_FULL_NAME", default_admin_config.get("full_name", "Administrator")),
+            "disabled": default_admin_config.get("disabled", False)
+        }
+
         return AuthenticationConfig(
             enable=auth_data.get('enable', True),
             secret_key=auth_data.get('secret_key', ''),
             algorithm=auth_data.get('algorithm', 'HS256'),
             access_token_expire_time=auth_data.get('access_token_expire_time', 3600),
             refresh_token_expire_time=auth_data.get('refresh_token_expire_time', 2592000),
-            default_admin=auth_data.get('default_admin', {})
+            default_admin=default_admin
         )
     
     @staticmethod
