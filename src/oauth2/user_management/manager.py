@@ -1,7 +1,7 @@
 """
 User management logic
 """
-
+from dotenv import load_dotenv
 import os
 import warnings
 from typing import List, Optional
@@ -22,6 +22,8 @@ pwd_context = CryptContext(
     deprecated="auto"
 )
 
+load_dotenv()
+
 
 class UserManager:
     """User management functionality"""
@@ -40,14 +42,17 @@ class UserManager:
         try:
             admin_user = db.query(UserDB).filter(UserDB.username == "admin").first()
             if not admin_user:
-                # Get admin credentials from config
+                # Get admin credentials from .env or config
                 config = get_config()
                 default_admin = config.get_default_admin()
-                
-                admin_username = default_admin.get("username", "")
-                admin_password = default_admin.get("password", "")
-                admin_email = default_admin.get("email", "")
-                admin_fullname = default_admin.get("full_name", "")
+                admin_username = os.getenv("ADMIN_USERNAME", 
+                                           default_admin.get("username", "admin"))
+                admin_password = os.getenv("ADMIN_PASSWORD", 
+                                           default_admin.get("password", "secret"))
+                admin_email = os.getenv("ADMIN_EMAIL", 
+                                        default_admin.get("email", "admin@example.com"))
+                admin_fullname = os.getenv("ADMIN_FULLNAME", 
+                                           default_admin.get("full_name", "Admin User"))
                 if not admin_username or not admin_password or not admin_email or not admin_fullname:
                     raise ValueError("Default admin credentials are not properly configured.")
                 

@@ -1,11 +1,14 @@
 """
 Configuration manager class
 """
+from dotenv import load_dotenv
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from .models import AuthenticationConfig, DatabaseConfig, LoggingConfig, ModelConfig
 from .loader import ConfigLoader
+
+load_dotenv()
 
 
 class Config:
@@ -20,7 +23,7 @@ class Config:
         """
         if config_path is None:
             # load config with environment variable
-            config_path = os.getenv("ASSET_PATH", "asset/config.yml")
+            config_path = os.getenv("CONFIG_ASSET_PATH", "asset/config.yml")
             if not config_path:
                 # Fallback to default path if environment variable is not set
                 project_root = Path(__file__).parent.parent.parent

@@ -18,6 +18,7 @@ const nextConfig = {
     allowedDevOrigins: [
       'localhost',
       '127.0.0.1',
+      '172.16.120.*',
     ],
     webpack: (config, { dev, isServer }) => {
       if (dev && !isServer) {

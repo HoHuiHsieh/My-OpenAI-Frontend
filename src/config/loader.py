@@ -34,7 +34,7 @@ class ConfigLoader:
             "username": os.getenv("ADMIN_USERNAME", default_admin_config.get("username", "admin")),
             "password": os.getenv("ADMIN_PASSWORD", default_admin_config.get("password", "admin")),
             "email": os.getenv("ADMIN_EMAIL", default_admin_config.get("email", "admin@example.com")),
-            "full_name": os.getenv("ADMIN_FULL_NAME", default_admin_config.get("full_name", "Administrator")),
+            "full_name": os.getenv("ADMIN_FULLNAME", default_admin_config.get("full_name", "Administrator")),
             "disabled": default_admin_config.get("disabled", False)
         }
 
