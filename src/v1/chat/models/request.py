@@ -365,7 +365,7 @@ class ChatCompletionRequest(BaseModel):
         description="Penalty for presence of tokens in the response.",
     )
     response_format: Optional[ResponseFormat] = Field(
-        default=None,
+        default=TextResponseFormat(),
         description="The format of the response.",
     )
     service_tier: Optional[Literal['auto']] = Field(
