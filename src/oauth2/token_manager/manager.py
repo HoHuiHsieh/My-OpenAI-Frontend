@@ -57,7 +57,6 @@ class TokenManager:
         If old_token is provided, revoke it first
         """
         # Revoke the old refresh token if provided
-        print(old_token)
         if old_token:
             self.revoke_refresh_token(db, old_token)
         
