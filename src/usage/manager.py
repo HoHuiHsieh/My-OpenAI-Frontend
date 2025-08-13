@@ -13,6 +13,9 @@ from psycopg2 import sql
 from config import Config
 from .models import UsageResponse, UsageSummary, UsageEntry
 from .handler import create_usage_log_handler
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class UsageManager:
@@ -168,7 +171,8 @@ class UsageManager:
             # Build the query
             table_name = f"{self.config.get_table_prefix()}_usage"
             
-            base_query = sql.SQL("""
+            # Start with base query parts
+            query_parts = [sql.SQL("""
                 SELECT 
                     date_trunc(%s, timestamp) as time_period,
                     SUM(prompt_tokens) as prompt_tokens,
@@ -180,34 +184,37 @@ class UsageManager:
                     MAX(timestamp) as end_date
                 FROM {table}
                 WHERE timestamp >= %s AND timestamp <= %s
-            """).format(table=sql.Identifier(table_name))
+            """).format(table=sql.Identifier(table_name))]
 
             query_params = [date_trunc, start_date, end_date]
 
             # Add user filter if specified
             if user_id:
-                base_query = sql.SQL(str(base_query) + " AND user_id = %s")
-                query_params.append(user_id)
+                query_parts.append(sql.SQL(" AND user_id = %s"))
+                query_params.append(str(user_id))
 
             # Add model filter if specified
             if model and model != "all":
-                base_query = sql.SQL(str(base_query) + " AND model = %s")
+                query_parts.append(sql.SQL(" AND model = %s"))
                 query_params.append(model)
 
             # Add grouping and ordering
             if time != "all":
-                base_query = sql.SQL(str(base_query) + """
+                query_parts.append(sql.SQL("""
                     GROUP BY date_trunc(%s, timestamp)
                     ORDER BY time_period DESC
                     LIMIT %s
-                """)
+                """))
                 query_params.extend([date_trunc, period])
             else:
-                base_query = sql.SQL(str(base_query) + """
+                query_parts.append(sql.SQL("""
                     GROUP BY date_trunc(%s, timestamp)
                     ORDER BY time_period DESC
-                """)
+                """))
                 query_params.append(date_trunc)
+
+            # Combine all query parts
+            base_query = sql.Composed(query_parts)
 
             with self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(base_query, query_params)
@@ -231,7 +238,11 @@ class UsageManager:
                 return results
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
+            # Log the error and return an empty list
             print(f"Error retrieving usage data: {e}", file=sys.stderr)
+            logger.error(f"Error retrieving usage data: {e}")
             return []
 
     def get_usage_summary(
@@ -337,7 +348,7 @@ class UsageManager:
                 ORDER BY timestamp DESC
                 LIMIT %s
             """).format(table=sql.Identifier(table_name))
-            params = [user_id, start_date, end_date, limit]
+            params = [str(user_id), start_date, end_date, limit]
 
             with self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(query, params)
