@@ -105,7 +105,7 @@ def _count_tokens(text: str, triton_client: TritonClient) -> int:
     try:
         # Send inference request to count tokens
         num_tokens = triton_client.client.infer(
-            model_name="usage_counter",
+            model_name="counter",
             inputs=triton_client.inputs,
             outputs=triton_client.outputs,
             request_id=uuid.uuid4().hex[:8]
@@ -339,7 +339,7 @@ async def query_streaming_chat_completion(data: ChatCompletionRequest, user_id=N
                                                "INT32", [len(tokens_buffer)])
                     tokenizor_client.set_output("output")
                     completed_chunk = tokenizor_client.client.infer(
-                        model_name="tokenize",
+                        model_name="tokenizer",
                         inputs=tokenizor_client.inputs,
                         outputs=tokenizor_client.outputs,
                         request_id=uuid.uuid4().hex[:8]

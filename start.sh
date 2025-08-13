@@ -3,7 +3,7 @@
 
 # Check if an argument is provided
 if [ $# -eq 0 ]; then
-    echo "Usage: $0 [dev|serve|react-dev|compose-dev]"
+    echo "Usage: $0 [dev]"
     echo "  dev         - Start all services using docker-compose in dev mode"
     exit 1
 fi
@@ -16,7 +16,7 @@ case "$1" in
   dev)
     echo "Starting all services using docker-compose in development mode..."
     # Navigate to docker directory and run docker-compose
-    docker compose -f docker-compose.dev.yml up -d --build
+    docker compose -f docker-compose.dev.yml up -d --build --remove-orphans
     echo "All services started with docker-compose in development mode"
     ;;
 

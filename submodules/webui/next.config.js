@@ -20,6 +20,7 @@ const nextConfig = {
       '127.0.0.1',
       '172.16.120.*',
     ],
+    distDir: 'dist',
     webpack: (config, { dev, isServer }) => {
       if (dev && !isServer) {
         config.devtool = 'cheap-module-source-map';

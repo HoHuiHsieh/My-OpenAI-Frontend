@@ -3,3 +3,4 @@ logs/*.log
 share/*
 src-old
 test
+.env

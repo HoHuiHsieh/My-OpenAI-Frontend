@@ -4,19 +4,36 @@ services:
     environment:
       TZ: Asia/Taipei
     volumes:
-      - ./nginx/nginx.crt:/usr/share/nginx/ssl/nginx.crt
-      - ./nginx/nginx.key:/usr/share/nginx/ssl/nginx.key
+      - ./nginx/nginx.crt:/etc/nginx/ssl/nginx.crt:ro
+      - ./nginx/nginx.key:/etc/nginx/ssl/nginx.key:ro
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./nginx/cache:/etc/nginx/cache
       - ./nginx/log:/var/log/nginx
       - ./submodules/webui/out:/usr/share/nginx/www
     ports:
-      - 8080:8080
-      - 8443:8443
-    restart: always
+      - 80:80
+      - 443:443
+    networks:
+      - backend
+    restart: unless-stopped
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=postgresql
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=ai_innovation
+    expose:
+      - 5432
+    networks:
+      - backend
+    # volumes:
+    #   - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
   # Main service container
-  my_openai_frontend:
+  platform:
     build:
       context: .
       dockerfile: Dockerfile
@@ -26,40 +43,76 @@ services:
     working_dir: /workspace
     expose:
       - 3000
-    # ports:
-    #   - "3000:3000"
+    networks:
+      - backend
     restart: unless-stopped
-    command: tail -f /dev/null
+    stdin_open: true
+    tty: true
 
   # React development container
   webui:
     build:
-      context: .
-      dockerfile: submodules/webui/Dockerfile
+      context: ./submodules/webui
+      dockerfile: Dockerfile
     image: my_openai_frontend/webui:latest
-    volumes:
-      - .:/workspace
-    working_dir: /workspace
     expose:
+      - 3000
       - 8080
-    # ports:
-    #   - "8080:8080"
-    restart: unless-stopped
-    command: tail -f /dev/null
-
-  # PostgreSQL database
-  postgres:
-    image: postgres:latest
-    environment:
-      - POSTGRES_USER=postgresql
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=ai_platform_auth
-    expose:
-      - 5432
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./submodules/webui:/workspace
+    working_dir: /workspace
+    networks:
+      - backend
     restart: unless-stopped
+    stdin_open: true
+    tty: true  
+
+  # ----------------------------- Triton Inference Server ----------------------- #
+  tritonserver0:
+    image: nvcr.io/nvidia/tritonserver:25.03-trtllm-python-py3
+    runtime: nvidia
+    shm_size: 16g
+    environment:
+      TZ: Asia/Taipei
+      NVIDIA_VISIBLE_DEVICES: 0
+    volumes:
+      - ./submodules/triton-servers/meta-llama-3.3-70b-instruct/repo:/root/triton/repo
+      - ./submodules/triton-servers/meta-llama-3.3-70b-instruct/model:/root/triton/tokenizer
+      - ./submodules/triton-servers/meta-llama-3.3-70b-instruct/engine/FP8:/root/triton/engine
+    networks:
+      - backend
+    expose:
+      - 8000
+      - 8001
+    restart: always
+    command: tritonserver --model-repository=/root/triton/repo
+
+  tritonserver1:
+    build:
+      context: ./submodules/triton-servers
+      dockerfile: Dockerfile.whisper-nvembedv2
+    image: my_openai_frontend/tritonserver:whisper-large-v3-turbo
+    runtime: nvidia
+    shm_size: 16g
+    environment:
+      TZ: Asia/Taipei
+      NVIDIA_VISIBLE_DEVICES: 0
+    volumes:
+      - ./submodules/triton-servers/whisper-large-v3-turbo/repo/whisper-large-v3-turbo:/root/triton/repo/whisper-large-v3-turbo
+      - ./submodules/triton-servers/whisper-large-v3-turbo/model:/root/triton/model/whisper-large-v3-turbo
+      - ./submodules/triton-servers/nv-embed-v2/repo/nv-embed-v2:/root/triton/repo/nv-embed-v2
+      - ./submodules/triton-servers/nv-embed-v2/model:/root/triton/model/nv-embed-v2
+    networks:
+      - backend
+    expose:
+      - 8000
+      - 8001
+    restart: always
+    command: tritonserver --model-repository=/root/triton/repo
+    # stdin_open: true
+    # tty: true  
 
 volumes:
   postgres_data:
-    driver: local
+networks:
+  backend:

@@ -20,8 +20,8 @@ database:
   port: 5432
   username: postgresql
   password: password
-  database: ai_platform_auth
-  table_prefix: "myopenaiapi"  # Prefix for tables in the database
+  database: ai_innovation
+  table_prefix: "ai_innovation"  # Prefix for tables in the database
 
 # Logging Configuration
 logging:
@@ -40,7 +40,7 @@ logging:
 # Model Configuration
 models:
   llama-3.3-70b-instruct:
-    host: <llama_host_ip>
+    host: tritonserver0
     port: 8001
     type: ["chat:base"]
     response:
@@ -49,18 +49,16 @@ models:
       object: "model"
       owned_by: "organization-owner"
   nv-embed-v2:
-    host: <nv_embed_host_ip>
-    port: 9001
+    host: tritonserver1
+    port: 8001
     type: ["embeddings:base"]
-    args:
-      instruction: "Given a question, retrieve passages that answer the question."
     response:
       id: "nvidia/nv-embed-v2"
       created: 1749095099
       object: "model"
       owned_by: "organization-owner"
   whisper-large-v3-turbo:
-    host: <whisper_host_ip>
+    host: tritonserver1
     port: 8001
     type: ["audio:transcription"]
     response:
