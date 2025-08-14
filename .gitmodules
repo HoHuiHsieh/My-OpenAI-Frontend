@@ -1,0 +1,3 @@
+[submodule "submodules/triton_server"]
+	path = submodules/triton_server
+	url = https://github.com/HoHuiHsieh/My-Triton-Repo.git
