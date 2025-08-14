@@ -120,8 +120,8 @@ def serialize_message(data: ChatCompletionRequest) -> str:
         raise ValueError("Only one system message is allowed")
 
     # Check if the last message is a user message
-    if messages and messages[-1].role != "user":
-        raise ValueError("The last message must be a user message")
+    # if messages and messages[-1].role != "user":
+    #     raise ValueError("The last message must be a user message")
 
     # Create tool use prompt if tools are present
     tool_use_prompt = ""
