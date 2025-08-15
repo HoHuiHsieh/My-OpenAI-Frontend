@@ -1,7 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { userApi, AccessToken, User } from '@/services/user';
-import { log } from 'console';
 
 
 interface AuthContextProps {
@@ -74,7 +73,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Call the API to refresh the token
       const response = await userApi.refreshToken(refreshToken);
       if (!response || !response.access_token) {
-        return ; // Invalid response, do not proceed
+        return; // Invalid response, do not proceed
       }
 
       // Update access token state
@@ -83,6 +82,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return response;
 
     } catch (error) {
+      // Handle error during token refresh
       console.error('Failed to refresh token:', error);
       // Clear tokens on error
       localStorage.removeItem('refreshToken');
@@ -101,12 +101,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         // Call the handler to refresh the token
         const response = await handleRefreshToken();
-        if (!response || !response.expires_in) {
-          throw new Error('Invalid response from token refresh');
+        if (response && response.expires_in) {
+          // Get access token expiration time (sec)
+          expiresIn = response.expires_in;
+        } else {
+          console.error('Failed to retrieve expiration time from token refresh response');
         }
-
-        // Get access token expiration time (sec)
-        expiresIn = response.expires_in;
 
       } catch (error) {
         console.error('Failed to refresh token:', error);
