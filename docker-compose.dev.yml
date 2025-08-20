@@ -68,24 +68,42 @@ services:
     tty: true  
 
   # ----------------------------- Triton Inference Server ----------------------- #
+  # tritonserver0:
+  #   image: nvcr.io/nvidia/tritonserver:25.03-trtllm-python-py3
+  #   runtime: nvidia
+  #   shm_size: 16g
+  #   environment:
+  #     TZ: Asia/Taipei
+  #     NVIDIA_VISIBLE_DEVICES: 0
+  #   volumes:
+  #     - ./submodules/triton-servers/meta-llama-3.3-70b-instruct/repo:/root/triton/repo
+  #     - ./submodules/triton-servers/meta-llama-3.3-70b-instruct/model:/root/triton/tokenizer
+  #     - ./submodules/triton-servers/meta-llama-3.3-70b-instruct/engine/FP8:/root/triton/engine
+  #   networks:
+  #     - backend
+  #   expose:
+  #     - 8000
+  #     - 8001
+  #   restart: always
+  #   command: tritonserver --model-repository=/root/triton/repo
+
   tritonserver0:
-    image: nvcr.io/nvidia/tritonserver:25.03-trtllm-python-py3
+    image: nvcr.io/nvidia/tensorrt-llm/release:1.1.0rc0
     runtime: nvidia
     shm_size: 16g
     environment:
       TZ: Asia/Taipei
       NVIDIA_VISIBLE_DEVICES: 0
     volumes:
-      - ./submodules/triton-servers/meta-llama-3.3-70b-instruct/repo:/root/triton/repo
-      - ./submodules/triton-servers/meta-llama-3.3-70b-instruct/model:/root/triton/tokenizer
-      - ./submodules/triton-servers/meta-llama-3.3-70b-instruct/engine/FP8:/root/triton/engine
+      - ./submodules/triton_server/openai-gpt-oss-20b:/root/triton
     networks:
       - backend
     expose:
       - 8000
       - 8001
     restart: always
-    command: tritonserver --model-repository=/root/triton/repo
+    working_dir: /root/triton
+    command: ./script/run-serve.sh
 
   tritonserver1:
     build:
