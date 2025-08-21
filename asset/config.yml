@@ -39,24 +39,24 @@ logging:
 
 # Model Configuration
 models:
-  # nv-embed-v2:
-  #   host: tritonserver1
-  #   port: 8001
-  #   type: ["embeddings:base"]
-  #   response:
-  #     id: "nvidia/nv-embed-v2"
-  #     created: 1749095099
-  #     object: "model"
-  #     owned_by: "organization-owner"
-  # whisper-large-v3-turbo:
-  #   host: tritonserver1
-  #   port: 8001
-  #   type: ["audio:transcription"]
-  #   response:
-  #     id: "openai/whisper-large-v3-turbo"
-  #     created: 1749095099
-  #     object: "model"
-  #     owned_by: "organization-owner"
+  nv-embed-v2:
+    host: tritonserver1
+    port: 8001
+    type: ["embeddings:base"]
+    response:
+      id: "nvidia/nv-embed-v2"
+      created: 1749095099
+      object: "model"
+      owned_by: "organization-owner"
+  whisper-large-v3-turbo:
+    host: tritonserver1
+    port: 8001
+    type: ["audio:transcription"]
+    response:
+      id: "openai/whisper-large-v3-turbo"
+      created: 1749095099
+      object: "model"
+      owned_by: "organization-owner"
   gpt-oss-20b:
     host: tritonserver0
     port: 8000

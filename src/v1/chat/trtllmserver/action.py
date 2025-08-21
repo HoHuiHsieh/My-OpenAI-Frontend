@@ -42,23 +42,17 @@ except Exception as e:
 
 
 SYSTEM_PROMPT_TEMPLATE = (
-    "You are a helpful assistant."
-    "Current date and time: {current_date_time}"
-    ""
-    "Reasoning: medium"
-    ""
-    "# Valid channels: analysis, commentary, final. Channel must be included for every message."
+    "You are a helpful assistant.\n"
+    "Current date and time: {current_date_time}\n\n"
+    "Reasoning: medium\n\n"
+    "# Valid channels: analysis, commentary, final. Channel must be included for every message.\n"
     "{tool_call_system_prompt}"
 )
 
 DEVELOPER_PROMPT_TEMPLATE = (
-    "# Instructions"
-    ""
-    "{instructions}"
-    ""
-    ""
-    "# Tools"
-    ""
+    "# Instructions\n\n"
+    "{instructions}\n\n\n"
+    "# Tools\n\n"
     "{tool_call_developer_prompt}"
 )
 
@@ -103,6 +97,9 @@ def _prepare_messages(messages: List[ChatCompletionMessages], tools: List[ToolCa
     sys_message = next((msg for msg in messages if msg.role == "system"), None)
     if sys_message:
         instructions = sys_message.content
+
+    # remove all system messages from the messages
+    messages = [msg for msg in messages if msg.role != "system"]
 
     # Prepare prompts for tool call
     if tools:
@@ -226,6 +223,7 @@ async def query_chat_completion(data: ChatCompletionRequest, user_id=None, apiKe
 
         # Prepare messages
         prepared_message = _prepare_messages(messages, data.tools)
+        # print(json.dumps(prepared_message, ensure_ascii=False, indent=2))
         
         # Get response
         response: ChatCompletion = client.chat.completions.create(
