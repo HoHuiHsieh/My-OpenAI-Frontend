@@ -5,7 +5,7 @@ It includes functions to serialize chat messages into a format compatible with t
 """
 import json
 from typing import List
-from ..models.request import ChatCompletionMessages, ChatCompletionRequest, JsonSchema
+from ...models.request import ChatCompletionMessages, ChatCompletionRequest, JsonSchema
 from .tool_use import create_tool_use_prompt
 from logger import get_logger
 
