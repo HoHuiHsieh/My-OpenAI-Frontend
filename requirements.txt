@@ -1,4 +1,5 @@
 tritonclient[grpc]
+openai
 fastapi[standard]
 httpx
 pydantic

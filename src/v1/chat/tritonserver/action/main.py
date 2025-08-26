@@ -8,9 +8,12 @@ from typing import List, Union, AsyncGenerator, Callable
 from tritonclient.utils import InferenceServerException
 from logger import get_logger
 from config import get_config
-from ..models import (ChatCompletionRequest,
-                      ChatCompletionResponse, ChatCompletionStreamResponse)
-from ..models.response import ChatCompletionChoice, ChatCompletionStreamChoice, ChatCompletionStreamMessage, Usage, ChatCompletionMessage
+from ...models import (ChatCompletionRequest,
+                       ChatCompletionResponse,
+                       ChatCompletionStreamResponse,
+                       )
+from ...models.response import (ChatCompletionChoice, ChatCompletionStreamChoice,
+                                ChatCompletionStreamMessage, Usage, ChatCompletionMessage)
 from ..llama3 import serialize_message as serialize_llama3_messages
 from .connection import TritonClient
 from .util import extract_tool_calls_from_text, log_chat_api_usage
@@ -164,7 +167,8 @@ async def query_chat_completion(data: ChatCompletionRequest, user_id=None, apiKe
 
         # Create inference request task
         task = asyncio.create_task(
-            triton_client.infer(model_name=model_name, request_id=f"{request_id}_{i}")
+            triton_client.infer(model_name=model_name,
+                                request_id=f"{request_id}_{i}")
         )
         clients.append(triton_client)
         tasks.append(task)

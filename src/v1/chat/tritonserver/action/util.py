@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Tuple, Optional
 from logger import get_logger
 from usage import get_usage_logger
-from ..models.response import ToolCall, ToolCallFunction
+from ...models.response import ToolCall, ToolCallFunction
 
 
 # Set up logger for this module

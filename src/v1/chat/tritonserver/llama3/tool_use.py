@@ -1,5 +1,5 @@
 import json
-from ..models.request import (
+from ...models.request import (
     Tool,
     ChatCompletionRequest
 )

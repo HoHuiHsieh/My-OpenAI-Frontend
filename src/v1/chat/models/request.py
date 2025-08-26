@@ -249,9 +249,25 @@ class JsonResponseFormat(BaseModel):
     )
 
 
+class StructuralTagFormat(BaseModel):
+    """Structural tag format for the chat completion."""
+    type: Literal['structural_tag'] = Field(
+        default='structural_tag',
+        description="Type of the response format, currently only 'structural_tag' is supported.",
+    )
+    structures: List[Any] = Field(
+        description="List of structural tags for the response.",
+    )
+    triggers: List[str] = Field(
+        default=["<|channel|>commentary to="],
+        description="List of triggers for the response.",
+    )
+
+
 ResponseFormat = Union[TextResponseFormat,
                        JsonSchemaResponseFormat,
-                       JsonResponseFormat]
+                       JsonResponseFormat,
+                       StructuralTagFormat]
 
 
 class ToolChoiceFunctionOption(BaseModel):
@@ -295,6 +311,19 @@ class ToolFunctionParameters(BaseModel):
     properties: Dict[str, ToolFunctionParameterProperties] = Field(
         description="Properties of the parameters in JSON schema format.",
     )
+    required: Optional[List[str]] = Field(
+        default=[],
+        description="List of required properties for the parameters.",
+    )
+    
+    @field_validator('required')
+    @classmethod
+    def validate_required(cls, v, info):
+        if v and info.data.get('properties'):
+            properties_keys = set(info.data['properties'].keys())
+            # Constrain required to only include keys that exist in properties
+            v = [req for req in v if req in properties_keys]
+        return v
 
 
 class ToolFunction(BaseModel):

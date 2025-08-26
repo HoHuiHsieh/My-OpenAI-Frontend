@@ -2,7 +2,15 @@ import json
 from typing import List, Union
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, Request, Depends, Security
-from ..chat import ChatCompletionRequest, ChatCompletionResponse, ChatCompletionStreamResponse, query_chat_completion, query_streaming_chat_completion
+from ..chat import (
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    ChatCompletionStreamResponse,
+    query_chat_completion_with_triton,
+    query_streaming_chat_completion_with_triton,
+    query_chat_completion_with_trtllm,
+    query_streaming_chat_completion_with_trtllm
+)
 from apikey import validate_api_key, ApiKeyData
 from logger import get_logger
 
@@ -31,26 +39,41 @@ async def chat_completion(
     # Get api key from the request
     apiKey = request.headers.get("Authorization", "").replace("Bearer ", "")
 
-    # Check if the request is for streaming
-    is_streaming = body.stream
-    if is_streaming:
-        # Log the streaming mode
-        logger.debug("Run in streaming mode")
-
-        # Define a generator function to stream responses
-        stream_generator = query_streaming_chat_completion(body,
-                                                           user_id=apiKeyData.user_id,
-                                                           apiKey=apiKey)
-
-        # Return a streaming response
-        return StreamingResponse(
-            stream_generator,
-            media_type="text/event-stream"
-        )
-
-    # For non-streaming requests, call the query function directly
-    logger.debug("Run in non-streaming mode")
-    response = await query_chat_completion(body,
-                                           user_id=apiKeyData.user_id,
-                                           apiKey=apiKey)
-    return response
+    # Get model name from the request body
+    model_name = body.model.split("/")[-1]
+    if model_name in ["gpt-oss-20b", "gpt-oss-120b"]:
+        if body.stream:
+            # Define a generator function to stream responses
+            stream_generator = query_streaming_chat_completion_with_trtllm(body,
+                                                                           user_id=apiKeyData.user_id,
+                                                                           apiKey=apiKey)
+            # Return a streaming response
+            return StreamingResponse(
+                stream_generator,
+                media_type="text/event-stream"
+            )
+        else:
+            # For non-streaming requests, call the query function directly
+            response = await query_chat_completion_with_trtllm(body,
+                                                               user_id=apiKeyData.user_id,
+                                                               apiKey=apiKey)
+            return response
+    else:
+        # Route to triton server
+        # Check if the request is for streaming
+        if body.stream:
+            # Define a generator function to stream responses
+            stream_generator = query_streaming_chat_completion_with_triton(body,
+                                                                           user_id=apiKeyData.user_id,
+                                                                           apiKey=apiKey)
+            # Return a streaming response
+            return StreamingResponse(
+                stream_generator,
+                media_type="text/event-stream"
+            )
+        else:
+            # For non-streaming requests, call the query function directly
+            response = await query_chat_completion_with_triton(body,
+                                                               user_id=apiKeyData.user_id,
+                                                               apiKey=apiKey)
+            return response

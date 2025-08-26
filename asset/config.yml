@@ -6,7 +6,7 @@ oauth2:
   access_token_expire_time: 3600  # 1 hour expiration for access tokens
   refresh_token_expire_time: 2592000  # 30 days expiration for refresh tokens
   
-  # Default admin user settings
+  # Default admin user settings (set in .env or config)
   default_admin:
     username: admin
     email: <admin_email>
@@ -25,7 +25,7 @@ database:
 
 # Logging Configuration
 logging:
-  level: "DEBUG"  # Global logging level if not overridden by components
+  level: "WARNING"  # Global logging level if not overridden by components
   database:
     enabled: true  # Enable logging to the database
     retention_days: 365  # How many days to keep logs in the database
@@ -33,21 +33,12 @@ logging:
     enabled: true  # Always log to console as a fallback
     format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   components:
-    authentication: "DEBUG"
-    database: "INFO"
-    models: "INFO"
+    authentication: "WARNING"
+    database: "WARNING"
+    models: "WARNING"
 
 # Model Configuration
 models:
-  llama-3.3-70b-instruct:
-    host: tritonserver0
-    port: 8001
-    type: ["chat:base"]
-    response:
-      id: "meta/llama-3.3-70b-instruct"
-      created: 1749095099
-      object: "model"
-      owned_by: "organization-owner"
   nv-embed-v2:
     host: tritonserver1
     port: 8001
@@ -66,3 +57,21 @@ models:
       created: 1749095099
       object: "model"
       owned_by: "organization-owner"
+  gpt-oss-20b:
+    host: tritonserver0
+    port: 8000
+    type: ["chat:base"]
+    response:
+      id: "openai/gpt-oss-20b"
+      created: 1749095099
+      object: "model"
+      owned_by: "organization-owner"
+  # llama-3.3-70b-instruct:
+  #   host: tritonserver0
+  #   port: 8001
+  #   type: ["chat:base"]
+  #   response:
+  #     id: "meta/llama-3.3-70b-instruct"
+  #     created: 1749095099
+  #     object: "model"
+  #     owned_by: "organization-owner"
