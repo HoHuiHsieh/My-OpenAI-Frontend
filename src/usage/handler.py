@@ -14,6 +14,7 @@ Features:
 import logging
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 from psycopg2 import sql, OperationalError, InterfaceError
 import os
 import sys
@@ -54,13 +55,19 @@ class UsageLogHandler(logging.Handler):
     # Batching settings
     DEFAULT_BATCH_SIZE = 50
     DEFAULT_FLUSH_INTERVAL = 5.0  # seconds
+    
+    # Connection pool settings
+    DEFAULT_MIN_POOL_CONNECTIONS = 1
+    DEFAULT_MAX_POOL_CONNECTIONS = 10
 
     def __init__(self,
                  db_config:  Dict[str, Any],
                  table_prefix: str = "usage_",
                  batch_size: int = DEFAULT_BATCH_SIZE,
                  flush_interval: float = DEFAULT_FLUSH_INTERVAL,
-                 enable_batching: bool = True):
+                 enable_batching: bool = True,
+                 min_pool_connections: int = DEFAULT_MIN_POOL_CONNECTIONS,
+                 max_pool_connections: int = DEFAULT_MAX_POOL_CONNECTIONS):
         """
         Initialize the log handler with database connection parameters and settings.
 
@@ -70,6 +77,8 @@ class UsageLogHandler(logging.Handler):
             batch_size (int): Number of records to batch before writing to the database.
             flush_interval (float): Interval in seconds to flush batched records.
             enable_batching (bool): Whether to enable batching of log records.
+            min_pool_connections (int): Minimum number of connections in the pool.
+            max_pool_connections (int): Maximum number of connections in the pool.
 
         """
         super().__init__()
@@ -78,9 +87,11 @@ class UsageLogHandler(logging.Handler):
         self.batch_size = batch_size
         self.flush_interval = flush_interval
         self.enable_batching = enable_batching
+        self.min_pool_connections = min_pool_connections
+        self.max_pool_connections = max_pool_connections
 
-        # Connection management
-        self.connection = None
+        # Connection pool management
+        self.connection_pool = None
         self._connection_lock = threading.RLock()
         self._retry_count = 0
         self._last_retry_time = 0
@@ -106,8 +117,13 @@ class UsageLogHandler(logging.Handler):
         # Register cleanup on exit
         atexit.register(self.close)
 
-    def _create_table(self):
-        """Create the usage log table if it does not exist."""
+    def _create_table_with_connection(self, conn):
+        """
+        Create the usage log table if it does not exist.
+        
+        Args:
+            conn: Database connection to use
+        """
         table_name = f"{self.table_prefix}_usage"
 
         create_table_query = sql.SQL("""
@@ -129,7 +145,7 @@ class UsageLogHandler(logging.Handler):
             )
         """).format(table=sql.Identifier(table_name))
 
-        with self.connection.cursor() as cursor:
+        with conn.cursor() as cursor:
             cursor.execute(create_table_query)
 
             # Create indexes for better query performance
@@ -142,17 +158,25 @@ class UsageLogHandler(logging.Handler):
             ]
 
             for index_query in indexes:
-                cursor.execute(index_query)
+                try:
+                    cursor.execute(index_query)
+                except Exception as e:
+                    # Index creation failures are not critical
+                    print(f"Warning: Failed to create index: {e}", file=sys.stderr)
 
-    def _connect_to_db(self):
-        """Establish a connection to the PostgreSQL database."""
+    def _connect_to_db(self) -> bool:
+        """
+        Initialize connection pool with retry logic and exponential backoff.
+        
+        Returns:
+            bool: True if connection pool created successfully, False otherwise
+        """
         with self._connection_lock:
             # Check if we should retry (implement exponential backoff)
             current_time = time.time()
             if self._retry_count > 0:
                 wait_time = min(
-                    self.INITIAL_RETRY_DELAY *
-                    (self.BACKOFF_MULTIPLIER ** (self._retry_count - 1)),
+                    self.INITIAL_RETRY_DELAY * (self.BACKOFF_MULTIPLIER ** (self._retry_count - 1)),
                     self.MAX_RETRY_DELAY
                 )
                 if current_time - self._last_retry_time < wait_time:
@@ -162,19 +186,19 @@ class UsageLogHandler(logging.Handler):
                 return False
 
             try:
-                # Close existing connection if any
-                if self.connection:
+                # Close existing connection pool if any
+                if self.connection_pool:
                     try:
-                        self.connection.close()
+                        self.connection_pool.closeall()
                     except:
                         pass
 
-                # Create new connection
-                self.connection = psycopg2.connect(
-                    dbname=self.db_config.get(
-                        'database', self.db_config.get('name')),
-                    user=self.db_config.get(
-                        'username', self.db_config.get('user')),
+                # Create new connection pool
+                self.connection_pool = psycopg2.pool.ThreadedConnectionPool(
+                    minconn=self.min_pool_connections,
+                    maxconn=self.max_pool_connections,
+                    dbname=self.db_config.get('database', self.db_config.get('name')),
+                    user=self.db_config.get('username', self.db_config.get('user')),
                     password=self.db_config['password'],
                     host=self.db_config['host'],
                     port=self.db_config.get('port', 5432),
@@ -183,9 +207,13 @@ class UsageLogHandler(logging.Handler):
                     application_name=f"DatabaseUsageLogHandler-{self._pid}"
                 )
 
-                # Test the connection
-                with self.connection.cursor() as cursor:
-                    cursor.execute("SELECT 1")
+                # Test the connection pool
+                conn = self.connection_pool.getconn()
+                try:
+                    with conn.cursor() as cursor:
+                        cursor.execute("SELECT 1")
+                finally:
+                    self.connection_pool.putconn(conn)
 
                 # Initialize the database schema
                 if self._initialize_schema():
@@ -202,7 +230,7 @@ class UsageLogHandler(logging.Handler):
                 self._retry_count += 1
                 self._last_retry_time = current_time
 
-                error_msg = f"Database connection attempt {self._retry_count}/{self.MAX_RETRY_ATTEMPTS} failed: {e}"
+                error_msg = f"Database connection pool creation attempt {self._retry_count}/{self.MAX_RETRY_ATTEMPTS} failed: {e}"
                 print(error_msg, file=sys.stderr)
 
                 return False
@@ -214,22 +242,33 @@ class UsageLogHandler(logging.Handler):
         Returns:
             bool: True if initialization successful, False otherwise
         """
+        conn = None
         try:
+            # Get a connection from the pool
+            conn = self.connection_pool.getconn()
+            
             # Create the usage table with improved schema
-            self._create_table()
+            self._create_table_with_connection(conn)
 
             # Commit the changes
-            self.connection.commit()
+            conn.commit()
             return True
 
         except Exception as e:
-            print(
-                f"Failed to initialize database schema: {e}", file=sys.stderr)
-            try:
-                self.connection.rollback()
-            except:
-                pass
+            print(f"Failed to initialize database schema: {e}", file=sys.stderr)
+            if conn:
+                try:
+                    conn.rollback()
+                except:
+                    pass
             return False
+        finally:
+            # Always return connection to pool
+            if conn:
+                try:
+                    self.connection_pool.putconn(conn)
+                except:
+                    pass
 
     @contextmanager
     def _get_connection(self):
@@ -237,28 +276,70 @@ class UsageLogHandler(logging.Handler):
         Context manager for database connections with automatic retry.
 
         Yields:
-            psycopg2.connection: Database connection
+            psycopg2.connection: Database connection from pool
 
         Raises:
             Exception: If connection cannot be established after retries
         """
-        with self._connection_lock:
-            if not self._initialized or not self.connection or self.connection.closed:
+        conn = None
+        max_wait_attempts = 10
+        wait_attempt = 0
+        
+        try:
+            # Ensure we have a connection pool
+            if not self._initialized or not self.connection_pool:
                 if not self._connect_to_db():
-                    raise Exception(
-                        f"Failed to establish database connection: {self._init_error}")
+                    raise Exception(f"Failed to establish database connection pool: {self._init_error}")
 
+            # Try to get a connection from the pool with retry logic
+            while conn is None and wait_attempt < max_wait_attempts:
+                try:
+                    # Try to get a connection (will wait if pool is exhausted)
+                    conn = self.connection_pool.getconn()
+                    break
+                except psycopg2.pool.PoolError as e:
+                    # Pool exhausted, wait and retry
+                    wait_attempt += 1
+                    if wait_attempt >= max_wait_attempts:
+                        raise Exception(f"Connection pool exhausted after {max_wait_attempts} attempts: {e}")
+                    time.sleep(0.1 * wait_attempt)  # Exponential backoff
+                    
+            if conn is None:
+                raise Exception("Failed to acquire connection from pool")
+
+            # Verify the connection is still valid
             try:
-                yield self.connection
-            except (OperationalError, InterfaceError) as e:
-                # Connection lost, try to reconnect
-                print(
-                    f"Database connection lost, attempting reconnection: {e}", file=sys.stderr)
-                if self._connect_to_db():
-                    yield self.connection
-                else:
-                    raise Exception(
-                        f"Failed to reconnect to database: {self._init_error}")
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1")
+            except (OperationalError, InterfaceError):
+                # Connection is stale, return it and get a new one
+                self.connection_pool.putconn(conn, close=True)
+                conn = self.connection_pool.getconn()
+
+            yield conn
+
+        except (OperationalError, InterfaceError) as e:
+            # Connection lost, try to reconnect
+            print(f"Database connection lost, attempting reconnection: {e}", file=sys.stderr)
+            if conn:
+                try:
+                    self.connection_pool.putconn(conn, close=True)
+                except:
+                    pass
+                conn = None
+
+            if self._connect_to_db():
+                conn = self.connection_pool.getconn()
+                yield conn
+            else:
+                raise Exception(f"Failed to reconnect to database: {self._init_error}")
+        finally:
+            # Always return connection to pool
+            if conn:
+                try:
+                    self.connection_pool.putconn(conn)
+                except Exception as e:
+                    print(f"Error returning connection to pool: {e}", file=sys.stderr)
 
     def _start_batch_worker(self):
         """Start the background thread for batch processing."""
@@ -368,19 +449,24 @@ class UsageLogHandler(logging.Handler):
         if self._is_closing:
             return
 
-        record_data = self._prepare_record_data(record)
+        try:
+            record_data = self._prepare_record_data(record)
 
-        if self.enable_batching and self._batch_queue:
-            try:
-                # Try to add to batch queue (non-blocking)
-                self._batch_queue.put_nowait(record_data)
-                return
-            except queue.Full:
-                # Queue is full, fall back to direct write
-                pass
+            if self.enable_batching and self._batch_queue:
+                try:
+                    # Try to add to batch queue (non-blocking)
+                    self._batch_queue.put_nowait(record_data)
+                    return
+                except queue.Full:
+                    # Queue is full, fall back to direct write
+                    pass
 
-        # Direct write (not batching or queue full)
-        self._write_record_directly(record_data)
+            # Direct write (not batching or queue full)
+            self._write_record_directly(record_data)
+            
+        except Exception as e:
+            # Last resort: log to stderr
+            print(f"Failed to emit usage log record: {e}", file=sys.stderr)
 
     def flush(self):
         """
@@ -414,14 +500,21 @@ class UsageLogHandler(logging.Handler):
             'table_name': f"{self.table_prefix}_usage",
             'batching_enabled': self.enable_batching,
             'batch_size': self.batch_size if self.enable_batching else None,
-            'queue_size': self._batch_queue.qsize() if self.enable_batching else None
+            'queue_size': self._batch_queue.qsize() if self.enable_batching else None,
+            'pool_min_connections': self.min_pool_connections,
+            'pool_max_connections': self.max_pool_connections
         }
 
         try:
-            if self.connection and not self.connection.closed:
-                with self.connection.cursor() as cursor:
-                    cursor.execute("SELECT 1")
+            if self.connection_pool:
+                # Test connection pool by getting and returning a connection
+                conn = self.connection_pool.getconn()
+                try:
+                    with conn.cursor() as cursor:
+                        cursor.execute("SELECT 1")
                     status['connected'] = True
+                finally:
+                    self.connection_pool.putconn(conn)
         except:
             status['connected'] = False
 
@@ -442,19 +535,17 @@ class UsageLogHandler(logging.Handler):
                     self._batch_thread.join(timeout=5.0)
 
             except Exception as e:
-                print(
-                    f"Error during batch worker shutdown: {e}", file=sys.stderr)
+                print(f"Error during batch worker shutdown: {e}", file=sys.stderr)
 
-        # Close database connection
+        # Close connection pool
         with self._connection_lock:
-            if self.connection:
+            if self.connection_pool:
                 try:
-                    self.connection.close()
+                    self.connection_pool.closeall()
                 except Exception as e:
-                    print(
-                        f"Error closing database connection: {e}", file=sys.stderr)
+                    print(f"Error closing database connection pool: {e}", file=sys.stderr)
                 finally:
-                    self.connection = None
+                    self.connection_pool = None
 
         super().close()
 
@@ -640,5 +731,7 @@ def create_usage_log_handler(config):
         table_prefix=getattr(config, 'get_table_prefix', lambda: "usage_")(),
         batch_size=getattr(config, 'get_log_batch_size', lambda: UsageLogHandler.DEFAULT_BATCH_SIZE)(),
         flush_interval=getattr(config, 'get_log_flush_interval', lambda: UsageLogHandler.DEFAULT_FLUSH_INTERVAL)(),
-        enable_batching=getattr(config, 'get_enable_batching', lambda: True)()  # Re-enable batching
+        enable_batching=getattr(config, 'get_enable_batching', lambda: True)(),
+        min_pool_connections=getattr(config, 'get_min_pool_connections', lambda: UsageLogHandler.DEFAULT_MIN_POOL_CONNECTIONS)(),
+        max_pool_connections=getattr(config, 'get_max_pool_connections', lambda: UsageLogHandler.DEFAULT_MAX_POOL_CONNECTIONS)()
     )

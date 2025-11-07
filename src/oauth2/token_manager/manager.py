@@ -28,8 +28,8 @@ class TokenManager:
     
     def __init__(self):
         """Initialize token manager with default database configuration"""
-        self.engine = init_database()
-        self.SessionLocal = get_database_session()
+        # Initialize database tables (uses singleton engine)
+        init_database()
     
     def create_access_token(self, data: dict) -> str:
         """

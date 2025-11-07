@@ -28,15 +28,16 @@ class UserManager:
     
     def __init__(self):
         """Initialize user manager with default database configuration"""
-        self.engine = init_database()
-        self.SessionLocal = get_database_session()
+        # Initialize database tables (uses singleton engine)
+        init_database()
         
         # Create admin user if not exists
         self._create_default_admin_if_not_exists()
     
     def _create_default_admin_if_not_exists(self):
         """Create default admin user if not exists"""
-        db = self.SessionLocal()
+        SessionLocal = get_database_session()
+        db = SessionLocal()
         try:
             admin_user = db.query(UserDB).filter(UserDB.username == "admin").first()
             if not admin_user:

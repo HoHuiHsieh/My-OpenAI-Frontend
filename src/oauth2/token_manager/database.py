@@ -1,16 +1,23 @@
 """
-Database setup and token model
+Database setup and token model with optimized connection pooling
 """
 
 from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 from config import Config
+
+# Import shared database utilities
+from ..database import (
+    get_engine,
+    get_database_session,
+    init_database,
+    get_db,
+    Base
+)
 
 # Load configuration
 config = Config()
-Base = declarative_base()
 
 
 class RefreshTokenDB(Base):
@@ -23,20 +30,3 @@ class RefreshTokenDB(Base):
     expires_at = sa.Column(sa.DateTime)
     revoked = sa.Column(sa.Boolean, default=False)
     created_at = sa.Column(sa.DateTime, default=datetime.utcnow)
-
-
-def get_database_session():
-    """Create database session"""
-    db_url = config.get_database_connection_string()
-    engine = sa.create_engine(db_url)
-    Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    return SessionLocal
-
-
-def init_database():
-    """Initialize database tables"""
-    db_url = config.get_database_connection_string()
-    engine = sa.create_engine(db_url)
-    Base.metadata.create_all(engine)
-    return engine

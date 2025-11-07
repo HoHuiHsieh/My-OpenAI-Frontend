@@ -62,7 +62,9 @@ class UsageManager:
                 if db_handler:
                     usage_logger.addHandler(db_handler)
                     self._handlers['database'] = db_handler
-                    self.connection = db_handler.connection
+                    
+                    # Get a connection from the handler's connection pool
+                    self.connection = db_handler.connection_pool.getconn()
                 else:
                     print("Database handler not configured or failed to create", file=sys.stderr)
                     return False
@@ -113,6 +115,15 @@ class UsageManager:
                 return
 
             self._is_shutting_down = True
+
+            # Return database connection to pool
+            if self.connection and 'database' in self._handlers:
+                try:
+                    db_handler = self._handlers['database']
+                    if hasattr(db_handler, 'connection_pool') and db_handler.connection_pool:
+                        db_handler.connection_pool.putconn(self.connection)
+                except Exception as e:
+                    print(f"Error returning connection to pool: {e}", file=sys.stderr)
 
             # Close all handlers
             for handler in self._handlers.values():

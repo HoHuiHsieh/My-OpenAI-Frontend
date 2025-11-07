@@ -1,16 +1,23 @@
 """
-Database setup and user model
+Database setup and user model with optimized connection pooling
 """
 
 from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 from config import Config
+
+# Import shared database utilities
+from ..database import (
+    get_engine,
+    get_database_session,
+    init_database,
+    get_db,
+    Base
+)
 
 # Load configuration
 config = Config()
-Base = declarative_base()
 
 
 class UserDB(Base):
@@ -26,20 +33,3 @@ class UserDB(Base):
     scopes = sa.Column(sa.ARRAY(sa.String), default=[])
     created_at = sa.Column(sa.DateTime, default=datetime.utcnow)
     updated_at = sa.Column(sa.DateTime, onupdate=datetime.utcnow)
-
-
-def get_database_session():
-    """Create database session"""
-    db_url = config.get_database_connection_string()
-    engine = sa.create_engine(db_url)
-    Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    return SessionLocal
-
-
-def init_database():
-    """Initialize database tables"""
-    db_url = config.get_database_connection_string()
-    engine = sa.create_engine(db_url)
-    Base.metadata.create_all(engine)
-    return engine
