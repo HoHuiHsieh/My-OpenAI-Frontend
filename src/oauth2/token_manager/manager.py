@@ -10,7 +10,7 @@ from jose import jwt, JWTError
 from config import Config
 
 from . import models
-from .database import RefreshTokenDB, get_database_session, init_database
+from .database import RefreshTokenDB, get_database_session
 
 # Load configuration
 config = Config()
@@ -28,8 +28,9 @@ class TokenManager:
     
     def __init__(self):
         """Initialize token manager with default database configuration"""
-        # Initialize database tables (uses singleton engine)
-        init_database()
+        # Note: Database tables are initialized in main.py lifespan
+        # No need to call init_database() here to avoid duplicate initialization
+        pass
     
     def create_access_token(self, data: dict) -> str:
         """

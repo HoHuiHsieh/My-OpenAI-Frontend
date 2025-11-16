@@ -3,24 +3,13 @@ User management logic
 """
 
 import os
-import warnings
+import bcrypt
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
 from . import models
 from . import scopes
-from .database import UserDB, get_database_session, init_database
+from .database import UserDB, get_database_session
 from config import get_config
-
-# Suppress passlib deprecation warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning, module="passlib")
-warnings.filterwarnings("ignore", message=".*bcrypt.*", module="passlib")
-
-# Password hashing context - using bcrypt with warning suppression
-pwd_context = CryptContext(
-    schemes=["bcrypt"], 
-    deprecated="auto"
-)
 
 
 class UserManager:
@@ -28,8 +17,8 @@ class UserManager:
     
     def __init__(self):
         """Initialize user manager with default database configuration"""
-        # Initialize database tables (uses singleton engine)
-        init_database()
+        # Note: Database tables are initialized in main.py lifespan
+        # No need to call init_database() here to avoid duplicate initialization
         
         # Create admin user if not exists
         self._create_default_admin_if_not_exists()
@@ -67,12 +56,22 @@ class UserManager:
             db.close()
     
     def get_password_hash(self, password: str) -> str:
-        """Hash a password"""
-        return pwd_context.hash(password)
+        """Hash a password using bcrypt"""
+        # bcrypt requires bytes input
+        password_bytes = password.encode('utf-8')
+        # Generate salt and hash
+        salt = bcrypt.gensalt()
+        hashed = bcrypt.hashpw(password_bytes, salt)
+        # Return as string for database storage
+        return hashed.decode('utf-8')
     
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        """Verify password against hash"""
-        return pwd_context.verify(plain_password, hashed_password)
+        """Verify password against hash using bcrypt"""
+        # Convert both to bytes
+        password_bytes = plain_password.encode('utf-8')
+        hashed_bytes = hashed_password.encode('utf-8')
+        # Verify
+        return bcrypt.checkpw(password_bytes, hashed_bytes)
     
     def get_user(self, db: Session, username: str) -> Optional[models.User]:
         """Get user by username"""

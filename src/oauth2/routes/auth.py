@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
+from database.schema import UserDB
 from ..token_manager import TokenManager, Token
 from ..user_management import User
-from ..user_management.database import UserDB
 from .middleware import get_current_active_user, get_db
 
 # Initialize token manager

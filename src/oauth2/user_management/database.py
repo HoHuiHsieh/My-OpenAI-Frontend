@@ -1,35 +1,38 @@
 """
-Database setup and user model with optimized connection pooling
+Database setup and user model with optimized connection pooling.
+
+This module now uses the centralized database module for connection management.
 """
 
-from datetime import datetime
-import sqlalchemy as sa
-from sqlalchemy.ext.declarative import declarative_base
-from config import Config
-
-# Import shared database utilities
-from ..database import (
-    get_engine,
-    get_database_session,
-    init_database,
-    get_db,
-    Base
-)
-
-# Load configuration
-config = Config()
+# Import from centralized database module
+from database import get_engine, get_session_factory, Base
+from database.schema import UserDB
 
 
-class UserDB(Base):
-    """User database model"""
-    __tablename__ = f"{config.get_table_prefix()}_users"
+def get_database_session():
+    """
+    Get database session factory using centralized database module.
+    
+    Returns:
+        SQLAlchemy sessionmaker factory
+    """
+    return get_session_factory()
 
-    id = sa.Column(sa.Integer, primary_key=True, index=True)
-    username = sa.Column(sa.String, unique=True, index=True, nullable=False)
-    email = sa.Column(sa.String, unique=True, index=True, nullable=False)
-    fullname = sa.Column(sa.String, nullable=False)
-    hashed_password = sa.Column(sa.String, nullable=False)
-    active = sa.Column(sa.Boolean, default=True)
-    scopes = sa.Column(sa.ARRAY(sa.String), default=[])
-    created_at = sa.Column(sa.DateTime, default=datetime.utcnow)
-    updated_at = sa.Column(sa.DateTime, onupdate=datetime.utcnow)
+
+def init_database():
+    """
+    Initialize database tables.
+    
+    Note: This is now handled by the centralized database module.
+    This function is kept for backward compatibility.
+    """
+    from database import init_database as init_db
+    return init_db()
+
+
+# Export all for backward compatibility
+__all__ = [
+    'UserDB',
+    'get_database_session',
+    'init_database'
+]

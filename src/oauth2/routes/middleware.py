@@ -8,9 +8,9 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import JWTError
 
+from database import get_session_factory
 from ..token_manager import TokenManager, TokenData
 from ..user_management import UserManager, User, SCOPES
-from ..user_management.database import get_database_session
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/login")
 
@@ -21,7 +21,8 @@ user_manager = UserManager()
 
 def get_db():
     """Get database session"""
-    db = get_database_session()()
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
     try:
         yield db
     finally:
