@@ -7,12 +7,14 @@ import secrets
 from datetime import datetime, timedelta
 import threading
 from typing import Dict, Optional, List
-import psycopg2
-import psycopg2.extras
-from psycopg2 import sql
+from sqlalchemy import func, and_
+from sqlalchemy.orm import Session
+
 from config import Config
+from database import get_db_session
+from database.schema import UsageLogDB
 from .models import UsageResponse, UsageSummary, UsageEntry
-from .handler import create_usage_log_handler
+from .sqlalchemy_handler import create_usage_log_handler
 
 
 class UsageManager:
@@ -31,7 +33,6 @@ class UsageManager:
         self._initialized = False
         self._is_shutting_down = False
         self._lock = threading.RLock()
-        self.connection = None  # psycopg2 connection
 
     def initialize(self) -> bool:
         """
@@ -62,9 +63,6 @@ class UsageManager:
                 if db_handler:
                     usage_logger.addHandler(db_handler)
                     self._handlers['database'] = db_handler
-                    
-                    # Get a connection from the handler's connection pool
-                    self.connection = db_handler.connection_pool.getconn()
                 else:
                     print("Database handler not configured or failed to create", file=sys.stderr)
                     return False
@@ -116,15 +114,6 @@ class UsageManager:
 
             self._is_shutting_down = True
 
-            # Return database connection to pool
-            if self.connection and 'database' in self._handlers:
-                try:
-                    db_handler = self._handlers['database']
-                    if hasattr(db_handler, 'connection_pool') and db_handler.connection_pool:
-                        db_handler.connection_pool.putconn(self.connection)
-                except Exception as e:
-                    print(f"Error returning connection to pool: {e}", file=sys.stderr)
-
             # Close all handlers
             for handler in self._handlers.values():
                 try:
@@ -155,7 +144,7 @@ class UsageManager:
 
         Returns a list of usage statistics.
         """
-        if not self._initialized or not self.connection:
+        if not self._initialized:
             print("Usage manager not initialized", file=sys.stderr)
             return []
 
@@ -165,77 +154,64 @@ class UsageManager:
             
             if time == "day":
                 start_date = end_date - timedelta(days=period)
-                date_trunc = "day"
+                date_trunc_func = func.date_trunc('day', UsageLogDB.timestamp)
             elif time == "week":
                 start_date = end_date - timedelta(weeks=period)
-                date_trunc = "week"
+                date_trunc_func = func.date_trunc('week', UsageLogDB.timestamp)
             elif time == "month":
                 start_date = end_date - timedelta(days=period * 30)
-                date_trunc = "month"
+                date_trunc_func = func.date_trunc('month', UsageLogDB.timestamp)
             else:  # "all"
                 start_date = datetime(2020, 1, 1)  # Far past date
-                date_trunc = "day"
+                date_trunc_func = func.date_trunc('day', UsageLogDB.timestamp)
 
-            # Build the query
-            table_name = f"{self.config.get_table_prefix()}_usage"
-            
-            base_query = sql.SQL("""
-                SELECT 
-                    date_trunc(%s, timestamp) as time_period,
-                    SUM(prompt_tokens) as prompt_tokens,
-                    SUM(COALESCE(completion_tokens, 0)) as completion_tokens,
-                    SUM(total_tokens) as total_tokens,
-                    COUNT(*) as request_count,
-                    COUNT(DISTINCT user_id) as user_count,
-                    MIN(timestamp) as start_date,
-                    MAX(timestamp) as end_date
-                FROM {table}
-                WHERE timestamp >= %s AND timestamp <= %s
-            """).format(table=sql.Identifier(table_name))
+            with get_db_session() as session:
+                # Build the query
+                query = session.query(
+                    date_trunc_func.label('time_period'),
+                    func.sum(UsageLogDB.prompt_tokens).label('prompt_tokens'),
+                    func.sum(func.coalesce(UsageLogDB.completion_tokens, 0)).label('completion_tokens'),
+                    func.sum(UsageLogDB.total_tokens).label('total_tokens'),
+                    func.count().label('request_count'),
+                    func.count(func.distinct(UsageLogDB.user_id)).label('user_count'),
+                    func.min(UsageLogDB.timestamp).label('start_date'),
+                    func.max(UsageLogDB.timestamp).label('end_date')
+                ).filter(
+                    and_(
+                        UsageLogDB.timestamp >= start_date,
+                        UsageLogDB.timestamp <= end_date
+                    )
+                )
 
-            query_params = [date_trunc, start_date, end_date]
+                # Add user filter if specified
+                if user_id:
+                    query = query.filter(UsageLogDB.user_id == user_id)
 
-            # Add user filter if specified
-            if user_id:
-                base_query = sql.SQL(str(base_query) + " AND user_id = %s")
-                query_params.append(user_id)
+                # Add model filter if specified
+                if model and model != "all":
+                    query = query.filter(UsageLogDB.model == model)
 
-            # Add model filter if specified
-            if model and model != "all":
-                base_query = sql.SQL(str(base_query) + " AND model = %s")
-                query_params.append(model)
+                # Add grouping and ordering
+                query = query.group_by(date_trunc_func).order_by(date_trunc_func.desc())
 
-            # Add grouping and ordering
-            if time != "all":
-                base_query = sql.SQL(str(base_query) + """
-                    GROUP BY date_trunc(%s, timestamp)
-                    ORDER BY time_period DESC
-                    LIMIT %s
-                """)
-                query_params.extend([date_trunc, period])
-            else:
-                base_query = sql.SQL(str(base_query) + """
-                    GROUP BY date_trunc(%s, timestamp)
-                    ORDER BY time_period DESC
-                """)
-                query_params.append(date_trunc)
+                # Add limit if not "all"
+                if time != "all":
+                    query = query.limit(period)
 
-            with self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-                cursor.execute(base_query, query_params)
-                rows = cursor.fetchall()
+                rows = query.all()
 
                 results = []
                 for row in rows:
                     usage_response = UsageResponse(
-                        time_period=row['time_period'].isoformat() if row['time_period'] else None,
-                        prompt_tokens=int(row['prompt_tokens'] or 0),
-                        completion_tokens=int(row['completion_tokens'] or 0),
-                        total_tokens=int(row['total_tokens'] or 0),
-                        request_count=int(row['request_count'] or 0),
+                        time_period=row.time_period.isoformat() if row.time_period else None,
+                        prompt_tokens=int(row.prompt_tokens or 0),
+                        completion_tokens=int(row.completion_tokens or 0),
+                        total_tokens=int(row.total_tokens or 0),
+                        request_count=int(row.request_count or 0),
                         model=model if model != "all" else None,
-                        start_date=row['start_date'],
-                        end_date=row['end_date'],
-                        user_count=int(row['user_count'] or 0) if not user_id else None
+                        start_date=row.start_date,
+                        end_date=row.end_date,
+                        user_count=int(row.user_count or 0) if not user_id else None
                     )
                     results.append(usage_response)
 
@@ -243,6 +219,8 @@ class UsageManager:
 
         except Exception as e:
             print(f"Error retrieving usage data: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
             return []
 
     def get_usage_summary(
@@ -253,7 +231,7 @@ class UsageManager:
 
         Returns a summary of usage statistics including total tokens, requests, and time-based aggregations.
         """
-        if not self._initialized or not self.connection:
+        if not self._initialized:
             print("Usage manager not initialized", file=sys.stderr)
             return UsageSummary(
                 total_users=0,
@@ -263,36 +241,25 @@ class UsageManager:
             )
 
         try:
-            table_name = f"{self.config.get_table_prefix()}_usage"
             today = datetime.utcnow().date()
             
-            with self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            with get_db_session() as session:
                 # Get total number of unique users
-                cursor.execute(
-                    sql.SQL("SELECT COUNT(DISTINCT user_id) as total_users FROM {table}").format(
-                        table=sql.Identifier(table_name)
-                    )
-                )
-                total_users_result = cursor.fetchone()
-                total_users = int(total_users_result['total_users'] or 0)
+                total_users = session.query(func.count(func.distinct(UsageLogDB.user_id))).scalar()
+                total_users = int(total_users or 0)
 
                 # Get today's statistics
-                cursor.execute(
-                    sql.SQL("""
-                        SELECT 
-                            COUNT(DISTINCT user_id) as active_users_today,
-                            COUNT(*) as requests_today,
-                            SUM(total_tokens) as tokens_today
-                        FROM {table}
-                        WHERE DATE(timestamp) = %s
-                    """).format(table=sql.Identifier(table_name)),
-                    [today]
-                )
-                today_stats = cursor.fetchone()
+                today_stats = session.query(
+                    func.count(func.distinct(UsageLogDB.user_id)).label('active_users_today'),
+                    func.count().label('requests_today'),
+                    func.sum(UsageLogDB.total_tokens).label('tokens_today')
+                ).filter(
+                    func.date(UsageLogDB.timestamp) == today
+                ).one()
 
-                active_users_today = int(today_stats['active_users_today'] or 0)
-                requests_today = int(today_stats['requests_today'] or 0)
-                tokens_today = int(today_stats['tokens_today'] or 0)
+                active_users_today = int(today_stats.active_users_today or 0)
+                requests_today = int(today_stats.requests_today or 0)
+                tokens_today = int(today_stats.tokens_today or 0)
 
                 return UsageSummary(
                     total_users=total_users,
@@ -303,6 +270,8 @@ class UsageManager:
 
         except Exception as e:
             print(f"Error retrieving usage summary: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
             return UsageSummary(
                 total_users=0,
                 active_users_today=0,
@@ -324,7 +293,7 @@ class UsageManager:
         - **limit**: Maximum number of records to return
         Returns a list of UsageEntry objects.
         """
-        if not self._initialized or not self.connection:
+        if not self._initialized:
             print("Usage manager not initialized", file=sys.stderr)
             return []
 
@@ -339,27 +308,39 @@ class UsageManager:
             else:
                 start_date = datetime(2020, 1, 1)
 
-            table_name = f"{self.config.get_table_prefix()}_usage"
-            query = sql.SQL("""
-                SELECT id, timestamp, api_type, user_id, model, request_id,
-                       prompt_tokens, completion_tokens, total_tokens, input_count, extra_data
-                FROM {table}
-                WHERE user_id = %s AND timestamp >= %s AND timestamp <= %s
-                ORDER BY timestamp DESC
-                LIMIT %s
-            """).format(table=sql.Identifier(table_name))
-            params = [user_id, start_date, end_date, limit]
-
-            with self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-                cursor.execute(query, params)
-                rows = cursor.fetchall()
+            with get_db_session() as session:
+                query = session.query(UsageLogDB).filter(
+                    and_(
+                        UsageLogDB.user_id == user_id,
+                        UsageLogDB.timestamp >= start_date,
+                        UsageLogDB.timestamp <= end_date
+                    )
+                ).order_by(UsageLogDB.timestamp.desc()).limit(limit)
+                
+                rows = query.all()
                 entries = []
                 for row in rows:
-                    entry = UsageEntry(**row)
+                    # Detach from session before returning
+                    session.expunge(row)
+                    entry = UsageEntry(
+                        id=row.id,
+                        timestamp=row.timestamp,
+                        api_type=row.api_type,
+                        user_id=row.user_id,
+                        model=row.model,
+                        request_id=row.request_id,
+                        prompt_tokens=row.prompt_tokens,
+                        completion_tokens=row.completion_tokens,
+                        total_tokens=row.total_tokens,
+                        input_count=row.input_count,
+                        extra_data=row.extra_data
+                    )
                     entries.append(entry)
                 return entries
         except Exception as e:
             print(f"Error retrieving user request list: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
             return []
 
     def get_model_list(self) -> List[str]:
