@@ -150,20 +150,20 @@ class UsageManager:
 
         try:
             # Calculate time range based on period type
-            end_date = datetime.utcnow()
+            end_date = datetime.now()
             
             if time == "day":
                 start_date = end_date - timedelta(days=period)
-                date_trunc_func = func.date_trunc('day', UsageLogDB.timestamp)
+                date_trunc_func = func.date_trunc('day', func.timezone('localtime', UsageLogDB.timestamp))
             elif time == "week":
                 start_date = end_date - timedelta(weeks=period)
-                date_trunc_func = func.date_trunc('week', UsageLogDB.timestamp)
+                date_trunc_func = func.date_trunc('week', func.timezone('localtime', UsageLogDB.timestamp))
             elif time == "month":
                 start_date = end_date - timedelta(days=period * 30)
-                date_trunc_func = func.date_trunc('month', UsageLogDB.timestamp)
+                date_trunc_func = func.date_trunc('month', func.timezone('localtime', UsageLogDB.timestamp))
             else:  # "all"
                 start_date = datetime(2020, 1, 1)  # Far past date
-                date_trunc_func = func.date_trunc('day', UsageLogDB.timestamp)
+                date_trunc_func = func.date_trunc('day', func.timezone('localtime', UsageLogDB.timestamp))
 
             with get_db_session() as session:
                 # Build the query
@@ -241,7 +241,7 @@ class UsageManager:
             )
 
         try:
-            today = datetime.utcnow().date()
+            today = datetime.now().date()
             
             with get_db_session() as session:
                 # Get total number of unique users
@@ -298,7 +298,7 @@ class UsageManager:
             return []
 
         try:
-            end_date = datetime.utcnow()
+            end_date = datetime.now()
             if period == "day":
                 start_date = end_date - timedelta(days=1)
             elif period == "week":
