@@ -9,16 +9,10 @@ Contains factory functions for creating different types of logging handlers
 import logging
 import logging.handlers
 import sys
-import os
-from typing import Optional
-from pathlib import Path
-import logging
-import logging.handlers
-import sys
 from typing import Optional
 from pathlib import Path
 
-from .log_handler import DatabaseLogHandler
+from .sqlalchemy_handler import SQLAlchemyLogHandler
 
 
 def create_console_handler(config=None) -> Optional[logging.Handler]:
@@ -53,46 +47,23 @@ def create_console_handler(config=None) -> Optional[logging.Handler]:
         return None
 
 
-def create_database_handler(config) -> Optional[DatabaseLogHandler]:
+def create_database_handler(config) -> Optional[SQLAlchemyLogHandler]:
     """
-    Create and configure database handler using util configuration.
+    Create and configure SQLAlchemy-based database handler.
     
     Args:
         config: Configuration object from util module
         
     Returns:
-        Configured database handler or None if disabled/failed
+        Configured SQLAlchemy database handler or None if disabled/failed
     """
     if not config or not config.is_database_logging_enabled():
         return None
         
     try:
-        # Build database configuration using util config methods
-        db_config = {
-            'host': config.get_database_host(),
-            'port': config.get_database_port(),
-            'database': config.get_database_name(),
-            'username': config.database.username if config.database else '',
-            'password': config.database.password if config.database else '',
-            'ssl_mode': 'prefer'
-        }
-        
-        # Validate required database fields
-        required_fields = ['host', 'database', 'username', 'password']
-        missing_fields = [field for field in required_fields if not db_config.get(field)]
-        if missing_fields:
-            print(f"Missing required database configuration: {', '.join(missing_fields)}", file=sys.stderr)
-            return None
-        
-        # Get logging-specific configuration from util
-        table_prefix = config.get_table_prefix() or 'app'
-        retention_days = config.get_log_retention_days()
-        
-        # Create database handler with configuration from util
-        handler = DatabaseLogHandler(
-            db_config=db_config,
-            table_prefix=table_prefix,
-            retention_days=retention_days,
+        # Create SQLAlchemy handler (uses centralized database module)
+        handler = SQLAlchemyLogHandler(
+            config=config,
             batch_size=50,  # Could be made configurable in util if needed
             flush_interval=5.0,  # Could be made configurable in util if needed
             enable_batching=True  # Could be made configurable in util if needed
@@ -111,7 +82,7 @@ def create_database_handler(config) -> Optional[DatabaseLogHandler]:
         return handler
         
     except Exception as e:
-        print(f"Failed to create database handler: {e}", file=sys.stderr)
+        print(f"Failed to create SQLAlchemy database handler: {e}", file=sys.stderr)
         return None
 
 
