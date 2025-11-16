@@ -6,6 +6,9 @@ from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel
 
+# Import ApiKeyDB from centralized database schema
+from database.schema import ApiKeyDB
+
 
 class ApiKey(BaseModel):
     """API key response model"""
@@ -18,16 +21,3 @@ class ApiKeyData(BaseModel):
     user_id: int
     scopes: List[str] = []
     exp: Optional[datetime] = None
-
-
-class ApiKeyDB(BaseModel):
-    """API key DB model for ORM"""
-    id: int
-    apiKey: str
-    user_id: int
-    expires_at: datetime
-    revoked: bool = False
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
